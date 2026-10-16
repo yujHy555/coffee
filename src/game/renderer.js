@@ -950,191 +950,445 @@ export class WorldRenderer {
 
     // Nitro Foam Shield Aura if unlocked
     if (unlockedPowerups.has('nitro_shield') && player.shieldActive) {
-      ctx.strokeStyle = 'rgba(244, 114, 182, 0.75)';
-      ctx.fillStyle = 'rgba(251, 207, 232, 0.18)';
-      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = 'rgba(244, 114, 182, 0.78)';
+      ctx.fillStyle = 'rgba(251, 207, 232, 0.2)';
+      ctx.lineWidth = 2.8;
       ctx.beginPath();
-      ctx.arc(0, -4, 38 + Math.sin(time * 6) * 3, 0, Math.PI * 2);
+      ctx.arc(0, -4, 40 + Math.sin(time * 6) * 3, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     }
 
+    // Smoothly blend between FRONT view (0) when idle and 3/4 SIDE profile (1) when running/attacking
+    const speedRatio = Math.min(1, Math.abs(player.vx) / 140);
+    const isAction = !player.onGround || player.meleeTimer > 0 || player.shotCooldown > 0.1;
+    const sideMix = isAction ? Math.max(0.75, speedRatio) : speedRatio * 0.85;
+
     ctx.scale(player.facing, 1);
 
-    // Dynamic squash & stretch + running tilt
-    const tilt = player.vx * 0.00045;
+    // Dynamic squash & stretch + subtle forward run lean
+    const tilt = player.vx * 0.00038 * player.facing;
     ctx.rotate(tilt);
     ctx.scale(player.scaleX, player.scaleY);
 
-    // --- 1. Animated Legs & Red/Brown Boots (from Image 1 & Image 2) ---
+    // Character Sheet Palette Constants:
+    // Outline: #432212 | Cream Body: #F5E3C8 | Shadow Cream: #DEC39D | Highlight: #FFF9EE
+    // Coffee: #5A2E17 & #743C1F | Boot Red: #C63B33 | Cheek Coral: #F19483
+    const outlineCol = '#432212';
+    const limbCol = '#522915';
+
+    // --- 1. Back Arm (Visible in FRONT & 3/4 view, swings opposite to front arm) ---
     const runSwing = player.onGround
-      ? Math.sin(player.animTime * 15) * Math.min(1, Math.abs(player.vx) / 180)
-      : 0.55;
+      ? Math.sin(player.animTime * 15) * Math.min(1, Math.abs(player.vx) / 170)
+      : -0.55;
 
-    this.drawCupBoot(-9 + runSwing * 11, 20 - Math.abs(runSwing) * 4, runSwing * 0.45);
-    this.drawCupBoot(9 - runSwing * 11, 20 - Math.abs(runSwing) * 4, -runSwing * 0.45);
+    if (sideMix < 0.92) {
+      ctx.save();
+      const backArmX = -21 + sideMix * 10;
+      ctx.translate(backArmX, 3);
+      ctx.rotate(-runSwing * 0.45);
+      this.drawProtagonistArm(ctx, -1, false, false, 0);
+      ctx.restore();
+    }
 
-    // --- 2. Porcelain Cup Handle (Left side) ---
-    ctx.strokeStyle = '#3b1d0e';
-    ctx.fillStyle = '#fff8eb';
-    ctx.lineWidth = 3.2;
-    ctx.beginPath();
-    ctx.arc(-22, -2, 10, Math.PI * 0.45, Math.PI * 1.55);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#3b1d0e';
-    ctx.beginPath();
-    ctx.arc(-21, -2, 4.5, Math.PI * 0.45, Math.PI * 1.55);
-    ctx.stroke();
+    // --- 2. Legs & Cuffed Red Boots (Exact match to Character Sheet!) ---
+    const stride = runSwing * 10;
+    const leftLegX = -8 + sideMix * 5 + stride;
+    const rightLegX = 8 - sideMix * 3 - stride;
 
-    // --- 3. Porcelain Coffee Cup Body ---
-    const cupGrad = ctx.createLinearGradient(-22, -22, 22, 20);
-    cupGrad.addColorStop(0, '#fffdf9');
-    cupGrad.addColorStop(0.65, '#f5e6d3');
-    cupGrad.addColorStop(1, '#dec3a4');
+    // Far/Back Boot
+    this.drawCupBoot(
+      leftLegX,
+      20 - Math.max(0, -runSwing) * 4,
+      -runSwing * 0.38,
+      0.25 + sideMix * 0.65
+    );
+    // Near/Front Boot
+    this.drawCupBoot(
+      rightLegX,
+      21 - Math.max(0, runSwing) * 4,
+      runSwing * 0.38,
+      0.35 + sideMix * 0.65
+    );
 
-    ctx.fillStyle = cupGrad;
-    ctx.strokeStyle = '#36190b';
+    // --- 3. Thick Rounded C-Handle on the Left (-X) Side (Matches FRONT & SIDE views) ---
+    ctx.save();
+    const handleOffsetX = -23 + sideMix * 1.5;
+    ctx.translate(handleOffsetX, -2);
+
+    // Outer C-handle loop
+    ctx.fillStyle = '#E8CFB0';
+    ctx.strokeStyle = outlineCol;
     ctx.lineWidth = 3.4;
     ctx.beginPath();
-    ctx.moveTo(-23, -18);
-    ctx.lineTo(23, -18);
-    ctx.quadraticCurveTo(22, 18, 0, 20);
-    ctx.quadraticCurveTo(-22, 18, -23, -18);
+    ctx.arc(0, 0, 11.5, Math.PI * 0.42, Math.PI * 1.58);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
 
-    // --- 4. Top Rim & Sloshing Rich Espresso Inside! (Signature detail in both images) ---
-    ctx.fillStyle = '#e7d4bb';
-    ctx.strokeStyle = '#36190b';
-    ctx.lineWidth = 3;
+    // Inner C-handle cutout
+    ctx.fillStyle = '#24314c'; // Dark interior shadow
     ctx.beginPath();
-    ctx.ellipse(0, -18, 23, 6.5, 0, 0, Math.PI * 2);
+    ctx.arc(1, 0, 5.2, Math.PI * 0.48, Math.PI * 1.52);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    // --- 4. Wide Rounded Cream Porcelain Cup Body (Character Sheet Proportions) ---
+    ctx.save();
+    ctx.fillStyle = '#F5E3C8';
+    ctx.strokeStyle = outlineCol;
+    ctx.lineWidth = 3.5;
+    ctx.lineJoin = 'round';
+
+    // Bowl path: wide top (-25 to +25), smoothly rounded teacup base
+    ctx.beginPath();
+    ctx.moveTo(-25, -16);
+    ctx.lineTo(25, -16);
+    ctx.bezierCurveTo(25, 11, 14, 19, 0, 19);
+    ctx.bezierCurveTo(-15, 19, -25, 11, -25, -16);
+    ctx.closePath();
+    ctx.fill();
+
+    // Clip inside the cup body to paint the warm shading & glossy highlight from the sheet
+    ctx.save();
+    ctx.clip();
+
+    // Left & Bottom Crescent Shadow (#DEC39D)
+    ctx.fillStyle = '#DEC39D';
+    ctx.beginPath();
+    ctx.moveTo(-26, -18);
+    ctx.quadraticCurveTo(-18, 13, 22, 14);
+    ctx.lineTo(26, 22);
+    ctx.lineTo(-26, 22);
+    ctx.closePath();
+    ctx.fill();
+
+    // Right Vertical Glossy Cream Highlight (#FFF9EE)
+    ctx.fillStyle = 'rgba(255, 250, 240, 0.85)';
+    ctx.beginPath();
+    ctx.ellipse(18 - sideMix * 3, -2, 3.8, 11, 0.12, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+
+    // Re-stroke outer cup contour cleanly over clipped shading
+    ctx.strokeStyle = outlineCol;
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(-25, -16);
+    ctx.lineTo(25, -16);
+    ctx.bezierCurveTo(25, 11, 14, 19, 0, 19);
+    ctx.bezierCurveTo(-15, 19, -25, 11, -25, -16);
+    ctx.closePath();
+    ctx.stroke();
+
+    // --- 5. Thick Ceramic Top Rim & Concentric Rich Coffee Surface (Character Sheet Detail!) ---
+    // Outer ceramic rim lip
+    ctx.fillStyle = '#FFF6E8';
+    ctx.strokeStyle = outlineCol;
+    ctx.lineWidth = 3.3;
+    ctx.beginPath();
+    ctx.ellipse(0, -16, 25, 7.2, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
-    // Dynamic coffee splash wave on top of the cup
-    const slosh = Math.sin(time * 9) * 3;
-    ctx.fillStyle = '#5c280e';
-    ctx.strokeStyle = '#290f02';
-    ctx.lineWidth = 2.2;
+    // Inner rim shadow wall
+    ctx.fillStyle = '#DFC4A2';
     ctx.beginPath();
-    ctx.ellipse(0, -18, 19.5, 4.8, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, -15.5, 21.5, 5.2, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Jumping / Moving splash crown (just like Image 1 & 2!)
-    if (!player.onGround || Math.abs(player.vx) > 90) {
-      ctx.fillStyle = '#6f3212';
+    // Rich roast coffee pool with concentric crema rings
+    const slosh = Math.sin(time * 9) * 2.4;
+    ctx.fillStyle = '#5A2E17';
+    ctx.strokeStyle = outlineCol;
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.ellipse(0, -15.2, 20.5, 4.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Lighter crema ring inside coffee surface (exact match to sheet)
+    ctx.strokeStyle = '#7A4123';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.ellipse(0, -15.2, 14.5, 2.7, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Dynamic coffee splash wave when jumping or sprinting
+    if (!player.onGround || Math.abs(player.vx) > 120) {
+      ctx.fillStyle = '#5A2E17';
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(-14, -19);
-      ctx.quadraticCurveTo(-8, -32 + slosh, 2, -23);
-      ctx.quadraticCurveTo(10, -29 - slosh, 15, -18);
+      ctx.moveTo(-13, -16);
+      ctx.quadraticCurveTo(-7, -27 + slosh, 1, -20);
+      ctx.quadraticCurveTo(9, -25 - slosh, 14, -16);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
     }
 
-    // --- 5. Expressive Kawaii Eyes, Rosy Cheeks & Happy Smile ---
-    // Eyes
-    ctx.fillStyle = '#1f120b';
+    // --- 6. Character Sheet Face (Shifts smoothly from Center FRONT to Right Profile SIDE) ---
+    const faceShiftX = sideMix * 10.5;
+    ctx.save();
+    ctx.translate(faceShiftX, 0);
+
+    // Left Eye (Approaches right eye and foreshortens as cup turns to SIDE view)
+    const leftEyeX = -9.5 + sideMix * 4.5;
+    const leftEyeScaleX = 1 - sideMix * 0.35;
+    ctx.fillStyle = outlineCol;
     ctx.beginPath();
-    ctx.ellipse(-6, -2, 3.2, 4.2, 0, 0, Math.PI * 2);
-    ctx.ellipse(8, -2, 3.2, 4.2, 0, 0, Math.PI * 2);
+    ctx.ellipse(leftEyeX, -1.5, 3.3 * leftEyeScaleX, 3.8, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Eye catchlights
-    ctx.fillStyle = '#ffffff';
+    // Left Eye Upper-Right Catchlight (Matches sheet!)
+    ctx.fillStyle = '#FFFFFF';
     ctx.beginPath();
-    ctx.arc(-7, -3.5, 1.3, 0, Math.PI * 2);
-    ctx.arc(7, -3.5, 1.3, 0, Math.PI * 2);
+    ctx.arc(leftEyeX + 0.9 * leftEyeScaleX, -2.8, 1.25 * leftEyeScaleX, 0, Math.PI * 2);
     ctx.fill();
 
-    // Rosy cheeks
-    ctx.fillStyle = 'rgba(244, 114, 182, 0.45)';
+    // Right Eye (Foreshortens slightly at extreme profile)
+    const rightEyeX = 9.5 - sideMix * 1.5;
+    const rightEyeScaleX = 1 - sideMix * 0.25;
+    ctx.fillStyle = outlineCol;
     ctx.beginPath();
-    ctx.ellipse(-12, 3, 3.8, 2.2, 0, 0, Math.PI * 2);
-    ctx.ellipse(13, 3, 3.8, 2.2, 0, 0, Math.PI * 2);
+    ctx.ellipse(rightEyeX, -1.5, 3.3 * rightEyeScaleX, 3.8, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Happy open mouth
-    ctx.fillStyle = '#991b1b';
-    ctx.strokeStyle = '#1f120b';
-    ctx.lineWidth = 2;
+    // Right Eye Catchlight
+    ctx.fillStyle = '#FFFFFF';
     ctx.beginPath();
-    ctx.arc(1, 2, 4.2, 0.1, Math.PI - 0.1);
+    ctx.arc(rightEyeX + 0.9 * rightEyeScaleX, -2.8, 1.25 * rightEyeScaleX, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Warm Coral-Pink Oval Cheeks (#F19483)
+    ctx.fillStyle = '#F19483';
+    // Near cheek (prominent in both FRONT and SIDE view)
+    ctx.beginPath();
+    ctx.ellipse(leftEyeX - 3.5 * (1 - sideMix * 0.5), 3.8, 4.2, 2.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Far cheek (fades as it wraps around the right edge in SIDE view)
+    if (sideMix < 0.75) {
+      ctx.globalAlpha = (1 - sideMix / 0.75) * (player.invulnTimer > 0 ? 0.55 : 1);
+      ctx.beginPath();
+      ctx.ellipse(rightEyeX + 3.2, 3.8, 3.8, 2.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = player.invulnTimer > 0 && Math.floor(time * 20) % 2 === 0 ? 0.55 : 1;
+    }
+
+    // Happy Bean-Shaped Open Smile with Coral Tongue (#432212 cavity + #F08070 tongue)
+    const mouthX = sideMix * 3.2;
+    ctx.save();
+    ctx.translate(mouthX, 2.2);
+    ctx.fillStyle = '#4A2112';
+    ctx.strokeStyle = outlineCol;
+    ctx.lineWidth = 2.1;
+    ctx.beginPath();
+    ctx.moveTo(-3.8, -0.5);
+    ctx.quadraticCurveTo(0, 0.8, 3.8, -0.5);
+    ctx.bezierCurveTo(4.2, 5.2, -4.2, 5.2, -3.8, -0.5);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
 
-    // --- 6. Front Arm & Silver Barista Spoon (Image 2!) ---
+    // Pinkish-coral tongue inside lower mouth
+    ctx.fillStyle = '#F08070';
+    ctx.beginPath();
+    ctx.ellipse(0, 2.5, 2.4, 1.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.restore(); // end face group
+
+    // --- 7. Foreground Arm (Swings at side in FRONT view, reaches forward in SIDE view, or slashes Silver Spoon!) ---
     ctx.save();
     const spoonUpgraded = unlockedPowerups.has('silver_spoon');
-    const swingAngle = player.meleeTimer > 0
-      ? Math.sin((1 - player.meleeTimer / 0.24) * Math.PI) * 1.9 - 0.6
-      : Math.sin(time * 5) * 0.12;
+    const frontArmX = (1 - sideMix) * 21 + sideMix * -3;
+    const frontArmY = 3.5;
 
-    ctx.translate(18, 2);
-    ctx.rotate(swingAngle);
-
-    // Cute arm
-    ctx.strokeStyle = '#36190b';
-    ctx.lineWidth = 3.5;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(11, -4);
-    ctx.stroke();
-
-    // Silver Barista Spoon held in hand
-    ctx.fillStyle = spoonUpgraded ? '#fde047' : '#e2e8f0';
-    ctx.strokeStyle = '#1e293b';
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    ctx.roundRect(9, -24, 3.8, 22, 2);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.ellipse(11, -28, 6.5, 9, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Melee slash arc visual
-    if (player.meleeTimer > 0) {
-      ctx.strokeStyle = spoonUpgraded ? 'rgba(250, 204, 21, 0.9)' : 'rgba(186, 230, 253, 0.85)';
-      ctx.lineWidth = spoonUpgraded ? 9 : 6;
-      ctx.beginPath();
-      ctx.arc(0, 0, spoonUpgraded ? 48 : 34, -1.2, 1.1);
-      ctx.stroke();
-    }
+    ctx.translate(frontArmX, frontArmY);
+    this.drawProtagonistArm(
+      ctx,
+      1,
+      sideMix > 0.45,
+      player.meleeTimer > 0,
+      player.meleeTimer,
+      spoonUpgraded,
+      runSwing * 0.4
+    );
+    ctx.restore();
 
     ctx.restore();
     ctx.restore();
   }
 
-  drawCupBoot(x, y, angle) {
+  drawProtagonistArm(ctx, dir, isSidePointing, isSlashing, meleeTimer, spoonUpgraded = false, walkSwing = 0) {
+    const limbCol = '#522915';
+    const outlineCol = '#3A1B0C';
+
+    ctx.save();
+    if (isSlashing) {
+      // Dynamic Silver Barista Spoon Slash!
+      const slashProgress = 1 - meleeTimer / 0.24;
+      const swingAngle = Math.sin(slashProgress * Math.PI) * 2.1 - 0.75;
+      ctx.rotate(swingAngle);
+
+      ctx.strokeStyle = limbCol;
+      ctx.lineWidth = 4.2;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(9, 2, 17, -2);
+      ctx.stroke();
+
+      // Silver or Golden Barista Spoon
+      ctx.fillStyle = spoonUpgraded ? '#fde047' : '#e2e8f0';
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.roundRect(14, -24, 4, 23, 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.ellipse(16, -28, 6.8, 9.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Slash wave trail
+      ctx.strokeStyle = spoonUpgraded ? 'rgba(250, 204, 21, 0.9)' : 'rgba(186, 230, 253, 0.85)';
+      ctx.lineWidth = spoonUpgraded ? 9 : 6;
+      ctx.beginPath();
+      ctx.arc(0, 0, spoonUpgraded ? 48 : 35, -1.25, 1.15);
+      ctx.stroke();
+    } else if (isSidePointing) {
+      // Exact SIDE View Arm from Character Sheet: reaches forward horizontally across body with cute pointing finger!
+      ctx.rotate(walkSwing * 0.25);
+
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 5.4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(13, 4.5, 27, 1.5);
+      ctx.stroke();
+
+      ctx.strokeStyle = limbCol;
+      ctx.lineWidth = 3.6;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(13, 4.5, 27, 1.5);
+      ctx.stroke();
+
+      // Cute pointing hand (thumb up + index finger forward)
+      ctx.fillStyle = limbCol;
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(28, 1.2, 3.8, 2.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Pointing finger tip
+      ctx.beginPath();
+      ctx.roundRect(29, -1, 5.5, 2.8, 1.4);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      // Exact FRONT View Arm from Character Sheet: curved downward at side with cute 3-finger hand
+      ctx.rotate(walkSwing);
+
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 5.2;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(dir * 6, 7, dir * 5, 16);
+      ctx.stroke();
+
+      ctx.strokeStyle = limbCol;
+      ctx.lineWidth = 3.4;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(dir * 6, 7, dir * 5, 16);
+      ctx.stroke();
+
+      // Cute 3-fingered dark-brown hand
+      ctx.fillStyle = limbCol;
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.arc(dir * 5, 17, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  drawCupBoot(x, y, angle, toeProfile = 0.5) {
     const ctx = this.ctx;
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(angle);
 
-    // Leg
-    ctx.strokeStyle = '#36190b';
-    ctx.lineWidth = 3.8;
+    const outlineCol = '#432212';
+    const limbCol = '#522915';
+    const bootRed = '#C63B33';
+    const bootShadow = '#9E2A24';
+
+    // Dark brown stick leg
+    ctx.strokeStyle = outlineCol;
+    ctx.lineWidth = 5.4;
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(0, -7);
-    ctx.lineTo(0, 4);
+    ctx.moveTo(0, -8);
+    ctx.lineTo(0, 2);
     ctx.stroke();
 
-    // Red/Caramel Boot (Image 1 red boots!)
-    ctx.fillStyle = '#dc2626';
-    ctx.strokeStyle = '#36190b';
-    ctx.lineWidth = 2.4;
+    ctx.strokeStyle = limbCol;
+    ctx.lineWidth = 3.4;
     ctx.beginPath();
-    ctx.roundRect(-5, 2, 13, 8, 4);
+    ctx.moveTo(0, -8);
+    ctx.lineTo(0, 2);
+    ctx.stroke();
+
+    // Red Boot Shaft & Rounded Toe (Matches Character Sheet Palette Icon!)
+    const toeExt = 5 + toeProfile * 4.5;
+    ctx.fillStyle = bootRed;
+    ctx.strokeStyle = outlineCol;
+    ctx.lineWidth = 2.6;
+    ctx.lineJoin = 'round';
+
+    ctx.beginPath();
+    ctx.moveTo(-4.8, -1);
+    ctx.lineTo(4.2, -1);
+    ctx.lineTo(4.5, 3);
+    ctx.quadraticCurveTo(toeExt + 2, 3.5, toeExt + 1.5, 7.8);
+    ctx.lineTo(-5.2, 7.8);
+    ctx.closePath();
     ctx.fill();
     ctx.stroke();
+
+    // Top Boot Cuff Rim (as seen in FRONT/SIDE/BACK views)
+    ctx.fillStyle = bootRed;
+    ctx.beginPath();
+    ctx.roundRect(-5.6, -2.5, 10.6, 3.2, 1.5);
+    ctx.fill();
+    ctx.stroke();
+
+    // Darker Red Sole & Heel Line
+    ctx.fillStyle = bootShadow;
+    ctx.fillRect(-4.8, 5.8, toeExt + 5.5, 2);
+
+    // Subtle white highlight on boot toe
+    ctx.fillStyle = 'rgba(255, 225, 215, 0.55)';
+    ctx.beginPath();
+    ctx.ellipse(toeExt - 1.5, 4.8, 2.2, 1.1, 0, 0, Math.PI * 2);
+    ctx.fill();
 
     ctx.restore();
   }
