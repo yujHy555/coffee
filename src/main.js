@@ -1,6 +1,7 @@
 import { CoffeePlatformerEngine } from './game/engine.js';
 import { PRODUCTS } from './data/products.js';
 import { sound } from './audio/soundManager.js';
+import QRCode from 'qrcode';
 
 const canvas = document.getElementById('game-canvas');
 const hudHearts = document.getElementById('hud-hearts');
@@ -115,7 +116,12 @@ const engine = new CoffeePlatformerEngine(canvas, {
 
     // Weapon Action Buttons & Controls Bar Hints
     if (touchShotBtn && state.hasBeanGun) {
-      if (state.weaponType === 'golden_deagle') {
+      if (state.weaponType === 'supa_splat') {
+        touchShotBtn.innerHTML = '💥 Supa Splat';
+        touchShotBtn.style.background = 'linear-gradient(135deg, #ec4899, #0891b2)';
+        touchShotBtn.style.borderColor = '#f43f5e';
+        touchShotBtn.style.color = '#fff';
+      } else if (state.weaponType === 'golden_deagle') {
         touchShotBtn.innerHTML = '🦅 Deagle .50';
         touchShotBtn.style.background = 'linear-gradient(135deg, #ca8a04, #78350f)';
         touchShotBtn.style.borderColor = '#facc15';
@@ -128,7 +134,10 @@ const engine = new CoffeePlatformerEngine(canvas, {
       }
     }
     if (hintShot && state.hasBeanGun) {
-      if (state.weaponType === 'golden_deagle') {
+      if (state.weaponType === 'supa_splat') {
+        hintShot.innerHTML = '<kbd>X</kbd> / <kbd>Click</kbd> Supa Splat Gun 💥';
+        hintShot.style.color = '#f472b6';
+      } else if (state.weaponType === 'golden_deagle') {
         hintShot.innerHTML = '<kbd>X</kbd> / <kbd>Click</kbd> Golden Deagle .50 🦅';
         hintShot.style.color = '#facc15';
       } else {
@@ -347,10 +356,121 @@ document.getElementById('victory-replay-btn').addEventListener('click', () => {
   engine.paused = false;
 });
 
-document.getElementById('mute-btn').addEventListener('click', (e) => {
-  const muted = sound.toggleMute();
-  e.currentTarget.textContent = muted ? '🔇' : '🔊';
-});
+// Ambient Background Music & Master Audio Controls
+const bgmBtn = document.getElementById('bgm-btn');
+const muteBtn = document.getElementById('mute-btn');
+
+function updateAudioButtons() {
+  if (bgmBtn) {
+    const isPlaying = sound.bgmPlaying && !sound.bgmMuted;
+    bgmBtn.textContent = isPlaying ? '🎵' : '🔇';
+    bgmBtn.classList.toggle('active', isPlaying);
+    bgmBtn.title = isPlaying ? 'Ambient Music: ON (Click or M to mute)' : 'Ambient Music: OFF (Click or M to play)';
+  }
+  if (muteBtn) {
+    muteBtn.textContent = sound.muted ? '🔇' : '🔊';
+    muteBtn.title = sound.muted ? 'Master Sound: MUTED (Click to unmute)' : 'Master Sound: ON (Click to mute)';
+  }
+}
+
+if (bgmBtn) {
+  bgmBtn.addEventListener('click', () => {
+    sound.toggleBgm();
+    updateAudioButtons();
+  });
+}
+
+if (muteBtn) {
+  muteBtn.addEventListener('click', () => {
+    sound.toggleMasterMute();
+    updateAudioButtons();
+  });
+}
+
+// Auto-start ambient music on first user gesture (satisfies browser Web Audio autoplay policy)
+let audioUnlocked = false;
+function unlockAndStartAudio() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+  sound.init();
+  if (!sound.bgmPlaying && !sound.bgmMuted) {
+    sound.startBgm();
+    updateAudioButtons();
+  }
+  window.removeEventListener('keydown', unlockAndStartAudio);
+  window.removeEventListener('pointerdown', unlockAndStartAudio);
+}
+window.addEventListener('keydown', unlockAndStartAudio, { once: true });
+window.addEventListener('pointerdown', unlockAndStartAudio, { once: true });
+
+// QR Code Modal & Mobile Directory Direct Access
+const qrBtn = document.getElementById('qr-btn');
+const qrModal = document.getElementById('qr-modal');
+const closeQrBtn = document.getElementById('close-qr-btn');
+const qrContinueBtn = document.getElementById('qr-continue-btn');
+const qrCopyBtn = document.getElementById('qr-copy-btn');
+const qrUrlInput = document.getElementById('qr-url-input');
+const qrCanvas = document.getElementById('qr-canvas');
+
+const GAME_URL = 'https://coffee-zeta-weld.vercel.app/';
+
+if (qrCanvas) {
+  QRCode.toCanvas(
+    qrCanvas,
+    GAME_URL,
+    {
+      width: 220,
+      margin: 1,
+      color: {
+        dark: '#1e110a',
+        light: '#ffffff'
+      }
+    },
+    (err) => {
+      if (err) console.error('QR Code render error:', err);
+    }
+  );
+}
+
+if (qrBtn) {
+  qrBtn.addEventListener('click', () => {
+    engine.paused = true;
+    qrModal.classList.remove('hidden');
+  });
+}
+
+function closeQrModal() {
+  qrModal.classList.add('hidden');
+  engine.paused = false;
+}
+
+if (closeQrBtn) closeQrBtn.addEventListener('click', closeQrModal);
+if (qrContinueBtn) qrContinueBtn.addEventListener('click', closeQrModal);
+
+if (qrCopyBtn) {
+  qrCopyBtn.addEventListener('click', () => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(GAME_URL).then(() => {
+        qrCopyBtn.textContent = '✓ Copied!';
+        qrCopyBtn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+        setTimeout(() => {
+          qrCopyBtn.textContent = '📋 Copy';
+          qrCopyBtn.style.background = '';
+        }, 2000);
+      }).catch(() => {
+        if (qrUrlInput) {
+          qrUrlInput.select();
+          document.execCommand('copy');
+        }
+      });
+    } else if (qrUrlInput) {
+      qrUrlInput.select();
+      document.execCommand('copy');
+      qrCopyBtn.textContent = '✓ Copied!';
+      setTimeout(() => { qrCopyBtn.textContent = '📋 Copy'; }, 2000);
+    }
+  });
+}
 
 document.getElementById('restart-btn').addEventListener('click', () => {
   engine.victoryTriggered = false;
@@ -383,6 +503,9 @@ fullscreenBtn.addEventListener('click', toggleFullscreen);
 window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyF' && !engine.paused) {
     toggleFullscreen();
+  } else if (e.code === 'KeyM') {
+    sound.toggleBgm();
+    updateAudioButtons();
   }
 });
 

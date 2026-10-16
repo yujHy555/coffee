@@ -3429,11 +3429,12 @@ export class WorldRenderer {
       // =========================================================================
       // EQUIPPED GUN (Black Glock 16mm or Golden Desert Eagle .50)
       // =========================================================================
+      const isSupaSplat = weaponType === 'supa_splat';
       const isDeagle = weaponType === 'golden_deagle';
-      const duration = isDeagle ? 0.26 : 0.22;
+      const duration = isSupaSplat ? 0.24 : isDeagle ? 0.26 : 0.22;
       const recoilProg = isShooting ? gunShootTimer / duration : 0;
-      const kickX = -recoilProg * (isDeagle ? 8 : 6);
-      const kickAngle = -recoilProg * (isDeagle ? 0.26 : 0.22);
+      const kickX = -recoilProg * (isSupaSplat ? 8.5 : isDeagle ? 8 : 6);
+      const kickAngle = -recoilProg * (isSupaSplat ? 0.24 : isDeagle ? 0.26 : 0.22);
       const armAngle = isShooting ? -0.12 + kickAngle : 0.22 + walkSwing * 0.3;
 
       ctx.rotate(armAngle);
@@ -3467,8 +3468,10 @@ export class WorldRenderer {
       ctx.stroke();
 
       // Draw the equipped weapon!
-      if (isDeagle) {
-        this.drawGoldenDesertEagle50(ctx, handX, handY, isShooting, recoilProg);
+      if (isSupaSplat) {
+        this.drawSupaSplatGun(ctx, handX, handY, isShooting, recoilProg, time);
+      } else if (isDeagle) {
+        this.drawGoldenDesertEagle50(ctx, handX, handY, isShooting, recoilProg, time);
       } else {
         this.drawBlackGlock16mm(ctx, handX, handY, isShooting, recoilProg);
       }
@@ -4212,6 +4215,217 @@ export class WorldRenderer {
     ctx.restore();
   }
 
+  // =========================================================================
+  // SUPA SPLAT GUN (Retro-futuristic chunky neon splat blaster with glowing fluid tank)
+  // =========================================================================
+
+  drawSupaSplatGun(ctx, x, y, isShooting, recoilProg, time = 0) {
+    ctx.save();
+    ctx.translate(x, y);
+
+    // Stance angle
+    ctx.rotate(isShooting ? -0.04 : -0.16);
+
+    const kick = isShooting ? recoilProg * 7.5 : 0;
+    const pumpKick = isShooting ? recoilProg * 5.0 : 0;
+
+    // 1. Chunky Ergonomic Grip (Dark Matte Slate with grips)
+    ctx.fillStyle = '#0f172a';
+    ctx.strokeStyle = '#020617';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-4, 13);
+    ctx.lineTo(4, 13);
+    ctx.lineTo(5, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Grip texture ribs
+    ctx.strokeStyle = '#06b6d4';
+    ctx.lineWidth = 1.2;
+    for (let gy = 3; gy <= 10; gy += 3.5) {
+      ctx.beginPath();
+      ctx.moveTo(-1, gy);
+      ctx.lineTo(3.5, gy);
+      ctx.stroke();
+    }
+
+    // Trigger Guard & Neon Trigger
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(3, 4, 4.5, -Math.PI * 0.4, Math.PI * 0.5);
+    ctx.stroke();
+
+    ctx.fillStyle = '#f43f5e';
+    ctx.fillRect(2.5, 2.5, 2.2, 3.5);
+
+    // 2. Main Receiver Body (Vibrant Neon Cyan Chassis)
+    ctx.save();
+    ctx.translate(-kick * 0.35, 0);
+
+    const bodyGrad = ctx.createLinearGradient(0, -9, 0, 4);
+    bodyGrad.addColorStop(0, '#22d3ee');
+    bodyGrad.addColorStop(0.5, '#06b6d4');
+    bodyGrad.addColorStop(1, '#0891b2');
+
+    ctx.fillStyle = bodyGrad;
+    ctx.strokeStyle = '#083344';
+    ctx.lineWidth = 2.0;
+    ctx.beginPath();
+    ctx.roundRect(-3, -8, 26, 11, [4, 6, 2, 2]);
+    ctx.fill();
+    ctx.stroke();
+
+    // Neon Magenta Racing Accent Stripe
+    ctx.fillStyle = '#f43f5e';
+    ctx.fillRect(0, -2, 21, 2.8);
+
+    // Pressure Gauge on the side of the chassis
+    ctx.fillStyle = '#fef08a';
+    ctx.strokeStyle = '#78350f';
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.arc(6, -2, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Pressure needle
+    ctx.strokeStyle = '#dc2626';
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(6, -2);
+    ctx.lineTo(6 + Math.cos(time * 6) * 2.4, -2 + Math.sin(time * 6) * 2.4);
+    ctx.stroke();
+
+    // 3. Translucent Glass Slime Fluid Reservoir on top!
+    const tankX = 2;
+    const tankY = -16;
+    const tankW = 16;
+    const tankH = 8.5;
+
+    // Glass Tank Outer
+    ctx.fillStyle = 'rgba(224, 242, 254, 0.45)';
+    ctx.strokeStyle = '#06b6d4';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.roundRect(tankX, tankY, tankW, tankH, 4);
+    ctx.fill();
+    ctx.stroke();
+
+    // Glowing Neon Magenta Espresso Slime inside reservoir
+    const slimeGrad = ctx.createLinearGradient(0, tankY + 2, 0, tankY + tankH);
+    slimeGrad.addColorStop(0, '#f472b6');
+    slimeGrad.addColorStop(0.6, '#ec4899');
+    slimeGrad.addColorStop(1, '#be185d');
+
+    const sloshW = Math.sin(time * 8) * 1.5;
+    ctx.fillStyle = slimeGrad;
+    ctx.beginPath();
+    ctx.moveTo(tankX + 1.5, tankY + 3 + sloshW);
+    ctx.quadraticCurveTo(tankX + tankW * 0.5, tankY + 2 - sloshW, tankX + tankW - 1.5, tankY + 3);
+    ctx.lineTo(tankX + tankW - 1.5, tankY + tankH - 1.5);
+    ctx.lineTo(tankX + 1.5, tankY + tankH - 1.5);
+    ctx.closePath();
+    ctx.fill();
+
+    // Slime bubbles inside tank
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(tankX + 5, tankY + 5, 1.1, 0, Math.PI * 2);
+    ctx.arc(tankX + 11, tankY + 4, 0.9, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Brass Tank End-Caps with Rivets
+    ctx.fillStyle = '#f59e0b';
+    ctx.strokeStyle = '#78350f';
+    ctx.lineWidth = 1.1;
+    ctx.fillRect(tankX - 2, tankY - 0.5, 2.5, tankH + 1);
+    ctx.strokeRect(tankX - 2, tankY - 0.5, 2.5, tankH + 1);
+    ctx.fillRect(tankX + tankW - 0.5, tankY - 0.5, 2.5, tankH + 1);
+    ctx.strokeRect(tankX + tankW - 0.5, tankY - 0.5, 2.5, tankH + 1);
+
+    // 4. Heavy Ribbed Barrel & Chunky Nozzle
+    ctx.fillStyle = '#0284c7';
+    ctx.strokeStyle = '#083344';
+    ctx.lineWidth = 1.6;
+    ctx.fillRect(23, -6.5, 8, 8);
+    ctx.strokeRect(23, -6.5, 8, 8);
+
+    // Chunky Muzzle Bell with Glowing Magenta Drip Ring
+    ctx.fillStyle = '#f43f5e';
+    ctx.strokeStyle = '#881337';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.roundRect(30, -8, 5, 11, 2.5);
+    ctx.fill();
+    ctx.stroke();
+
+    // Glowing Aperture Core
+    ctx.fillStyle = '#fbcfe8';
+    ctx.fillRect(33.5, -5, 2, 5);
+
+    // 5. Under-Barrel Pneumatic Pump Slide Handle
+    ctx.fillStyle = '#0f172a';
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.roundRect(11 - pumpKick, 2, 12, 4.5, 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.restore(); // end body translate
+
+    // 6. JUICY NEON SPLAT MUZZLE FLASH!
+    if (isShooting && recoilProg > 0.04) {
+      const flashAlpha = Math.min(1, recoilProg * 1.9);
+      const muzzleX = 35 - kick * 0.35;
+      const muzzleY = -2.5;
+
+      ctx.save();
+      ctx.translate(muzzleX, muzzleY);
+      const flashScale = 1.2 + recoilProg * 1.2;
+      ctx.scale(flashScale, flashScale);
+
+      // Expanding neon pink splash shockwave
+      ctx.strokeStyle = `rgba(244, 63, 94, ${flashAlpha * 0.85})`;
+      ctx.lineWidth = 3.2;
+      ctx.beginPath();
+      ctx.arc(3, 0, 14 + (1 - recoilProg) * 8, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Radiant comic splat starburst
+      this.drawFourPointSparkle(8, 0, 32, `rgba(244, 63, 94, ${flashAlpha})`);
+      ctx.save();
+      ctx.rotate(Math.PI / 4);
+      this.drawFourPointSparkle(6, 0, 24, `rgba(6, 182, 212, ${flashAlpha * 0.9})`);
+      ctx.restore();
+
+      // Glowing white/pink plasma core
+      ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
+      ctx.beginPath();
+      ctx.ellipse(4, 0, 8, 4.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Splat slime droplets bursting forward
+      const dropletColors = ['#ec4899', '#f43f5e', '#38bdf8', '#ffffff'];
+      for (let s = 0; s < 5; s++) {
+        const sx = 12 + s * 4;
+        const sy = Math.sin(s * 2.1) * 7;
+        ctx.fillStyle = dropletColors[s % dropletColors.length];
+        ctx.beginPath();
+        ctx.arc(sx, sy, 1.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
   drawJetpackPickupVisual(ctx, time) {
     // Twin polished brass canisters with steam valve caps and nozzles
     const canW = 12;
@@ -4438,27 +4652,68 @@ export class WorldRenderer {
   drawJetpackHarness(ctx, player, sideMix) {
     if (!player.hasJetpack) return;
     ctx.save();
-    // Leather harness straps wrapped securely around the porcelain cup torso
-    ctx.strokeStyle = '#451a03';
-    ctx.lineWidth = 2.4;
+
+    // 2 outer vertical backpack-style shoulder straps that frame the cup flanks,
+    // completely clear of his eyes, eyebrows, rosy cheeks, and mouth!
+    const strapColor = '#451a03';
+    const highlightColor = '#78350f';
+    const buckleColor = '#facc15';
+    const buckleBorder = '#291105';
+
+    // 1. Far/Left Shoulder Strap (hugs the left outer contour of the cup)
+    const leftTopX = -17 - sideMix * 2;
+    const leftBotX = -19 - sideMix * 2;
+
+    ctx.strokeStyle = strapColor;
+    ctx.lineWidth = 3.2;
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(-22, -2);
-    ctx.quadraticCurveTo(0, 3, 20, -1);
+    ctx.moveTo(leftTopX, -13);
+    ctx.quadraticCurveTo(leftTopX - 3, 0, leftBotX, 11);
     ctx.stroke();
 
-    ctx.strokeStyle = '#78350f';
+    ctx.strokeStyle = highlightColor;
     ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.moveTo(-22, -2);
-    ctx.quadraticCurveTo(0, 3, 20, -1);
+    ctx.moveTo(leftTopX, -13);
+    ctx.quadraticCurveTo(leftTopX - 3, 0, leftBotX, 11);
     ctx.stroke();
 
-    // Bronze buckle at center
-    ctx.fillStyle = '#fde047';
-    ctx.strokeStyle = '#291105';
-    ctx.lineWidth = 1.2;
-    ctx.fillRect(-2.5, 0, 5, 5);
-    ctx.strokeRect(-2.5, 0, 5, 5);
+    // Left lower brass adjustment buckle (near waist/hip, below face)
+    ctx.fillStyle = buckleColor;
+    ctx.strokeStyle = buckleBorder;
+    ctx.lineWidth = 1.1;
+    ctx.fillRect(leftBotX - 2.5, 5, 5, 4.5);
+    ctx.strokeRect(leftBotX - 2.5, 5, 5, 4.5);
+
+    // 2. Near/Right Shoulder Strap (hugs the right outer contour, only when visible in angle)
+    if (sideMix < 0.82) {
+      const rightTopX = 14 - sideMix * 5;
+      const rightBotX = 16 - sideMix * 5;
+
+      ctx.strokeStyle = strapColor;
+      ctx.lineWidth = 3.2;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(rightTopX, -13);
+      ctx.quadraticCurveTo(rightTopX + 2, 0, rightBotX, 11);
+      ctx.stroke();
+
+      ctx.strokeStyle = highlightColor;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(rightTopX, -13);
+      ctx.quadraticCurveTo(rightTopX + 2, 0, rightBotX, 11);
+      ctx.stroke();
+
+      // Right lower brass adjustment buckle (near waist/hip, below face)
+      ctx.fillStyle = buckleColor;
+      ctx.strokeStyle = buckleBorder;
+      ctx.lineWidth = 1.1;
+      ctx.fillRect(rightBotX - 2.5, 5, 5, 4.5);
+      ctx.strokeRect(rightBotX - 2.5, 5, 5, 4.5);
+    }
+
     ctx.restore();
   }
 
@@ -4474,6 +4729,7 @@ export class WorldRenderer {
     ctx.save();
     ctx.translate(sx, pickup.y + bob);
 
+    const isSupaSplat = pickup.type === 'supa_splat';
     const isDeagle = pickup.type === 'golden_deagle';
     const isJetpack = pickup.type === 'thruster_jetpack';
 
@@ -4483,6 +4739,10 @@ export class WorldRenderer {
       aura.addColorStop(0, 'rgba(56, 189, 248, 0.88)');
       aura.addColorStop(0.55, 'rgba(250, 204, 21, 0.45)');
       aura.addColorStop(1, 'rgba(56, 189, 248, 0)');
+    } else if (isSupaSplat) {
+      aura.addColorStop(0, 'rgba(236, 72, 153, 0.92)');
+      aura.addColorStop(0.55, 'rgba(6, 182, 212, 0.55)');
+      aura.addColorStop(1, 'rgba(236, 72, 153, 0)');
     } else if (isDeagle) {
       aura.addColorStop(0, 'rgba(250, 204, 21, 0.85)');
       aura.addColorStop(0.55, 'rgba(245, 158, 11, 0.45)');
@@ -4502,7 +4762,7 @@ export class WorldRenderer {
     ctx.rotate(time * 1.4);
     for (let i = 0; i < 4; i++) {
       ctx.rotate(Math.PI / 2);
-      this.drawFourPointSparkle(0, -24, 6, isJetpack ? '#38bdf8' : isDeagle ? '#fef08a' : '#fde047');
+      this.drawFourPointSparkle(0, -24, 6, isJetpack ? '#38bdf8' : isSupaSplat ? '#f472b6' : isDeagle ? '#fef08a' : '#fde047');
     }
     ctx.restore();
 
@@ -4512,6 +4772,8 @@ export class WorldRenderer {
     ctx.scale(1.35, 1.35);
     if (isJetpack) {
       this.drawJetpackPickupVisual(ctx, time);
+    } else if (isSupaSplat) {
+      this.drawSupaSplatGun(ctx, -10, 0, false, 0, time);
     } else if (isDeagle) {
       this.drawGoldenDesertEagle50(ctx, -10, 0, false, 0, time);
     } else {
@@ -4521,16 +4783,16 @@ export class WorldRenderer {
 
     // Floating Label Pill
     ctx.fillStyle = 'rgba(17, 18, 22, 0.94)';
-    ctx.strokeStyle = isJetpack ? '#38bdf8' : isDeagle ? '#facc15' : '#f472b6';
+    ctx.strokeStyle = isJetpack ? '#38bdf8' : isSupaSplat ? '#ec4899' : isDeagle ? '#facc15' : '#f472b6';
     ctx.lineWidth = 1.6;
     ctx.beginPath();
-    const labelText = isJetpack ? '★ STEAM TURBO JETPACK ★' : isDeagle ? '★ GOLDEN DESERT EAGLE .50 ★' : '★ BLACK GLOCK 16mm ★';
-    const pillW = isJetpack ? 170 : isDeagle ? 176 : 132;
+    const labelText = isJetpack ? '★ STEAM TURBO JETPACK ★' : isSupaSplat ? '💥 SUPA SPLAT GUN 💥' : isDeagle ? '★ GOLDEN DESERT EAGLE .50 ★' : '★ BLACK GLOCK 16mm ★';
+    const pillW = isJetpack ? 170 : isSupaSplat ? 154 : isDeagle ? 176 : 132;
     ctx.roundRect(-pillW / 2, -38, pillW, 20, 9);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = isJetpack ? '#7dd3fc' : isDeagle ? '#fef08a' : '#fde047';
+    ctx.fillStyle = isJetpack ? '#7dd3fc' : isSupaSplat ? '#fbcfe8' : isDeagle ? '#fef08a' : '#fde047';
     ctx.font = 'bold 10px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(labelText, 0, -24);
@@ -4547,9 +4809,50 @@ export class WorldRenderer {
     ctx.translate(sx, proj.y);
 
     const dir = Math.sign(proj.vx) || 1;
+    const isSupaSplat = Boolean(proj.isSupaSplat);
     const isDeagle = Boolean(proj.isDeagleSlug);
 
-    if (isDeagle) {
+    if (isSupaSplat) {
+      // High-velocity glowing neon magenta/cyan splat slug!
+      const streakGrad = ctx.createLinearGradient(0, 0, -dir * 44, 0);
+      streakGrad.addColorStop(0, 'rgba(244, 63, 94, 0.95)');
+      streakGrad.addColorStop(0.5, 'rgba(6, 182, 212, 0.7)');
+      streakGrad.addColorStop(1, 'rgba(236, 72, 153, 0)');
+      ctx.fillStyle = streakGrad;
+      ctx.beginPath();
+      ctx.moveTo(0, -9);
+      ctx.lineTo(0, 9);
+      ctx.lineTo(-dir * 44, 0);
+      ctx.closePath();
+      ctx.fill();
+
+      // Slime droplet lobes
+      const slimeGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, 12);
+      slimeGrad.addColorStop(0, '#fbcfe8');
+      slimeGrad.addColorStop(0.4, '#f43f5e');
+      slimeGrad.addColorStop(1, '#9d174d');
+
+      ctx.fillStyle = slimeGrad;
+      ctx.strokeStyle = '#881337';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 11, 8.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Trailing splat globules
+      ctx.fillStyle = '#06b6d4';
+      ctx.beginPath();
+      ctx.arc(-dir * 9, 3, 3.2, 0, Math.PI * 2);
+      ctx.arc(-dir * 16, -2, 2.4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Specular shine catchlight
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.ellipse(3, -2.5, 3.2, 1.8, 0.2, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (isDeagle) {
       // Supercharged Golden Magnum Energy Streak & Shockwave Ring
       const streakGrad = ctx.createLinearGradient(0, 0, -dir * 46, 0);
       streakGrad.addColorStop(0, 'rgba(254, 240, 138, 0.95)');

@@ -62,7 +62,9 @@
                 <span>Product Vault</span>
                 <strong id="hud-products-count">0 / 4</strong>
               </button>
-              <button class="icon-hud-btn" id="mute-btn" title="Toggle Audio">🔊</button>
+              <button class="icon-hud-btn" id="bgm-btn" title="Toggle Ambient Background Music (M)">🎵</button>
+              <button class="icon-hud-btn" id="mute-btn" title="Master Sound Mute / Unmute">🔊</button>
+              <button class="icon-hud-btn" id="qr-btn" title="Scan QR Code to play on Mobile">📱</button>
               <button class="icon-hud-btn" id="restart-btn" title="Restart Level">↺</button>
               <button class="icon-hud-btn" id="fullscreen-btn" title="Toggle Fullscreen (F)">⛶</button>
             </div>
@@ -190,6 +192,32 @@
                 <button class="btn-secondary" id="victory-vault-btn">Inspect Product Vault</button>
                 <button class="btn-primary" id="victory-next-btn">Next Level ➔</button>
                 <button class="btn-secondary" id="victory-replay-btn">Replay ↺</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- QR CODE MODAL FOR MOBILE & DIRECTORY ACCESS -->
+          <div class="modal-backdrop hidden" id="qr-modal">
+            <div class="qr-dialog-card">
+              <div class="qr-header">
+                <span class="qr-badge">📱 INSTANT MOBILE ACCESS</span>
+                <button class="modal-close-icon" id="close-qr-btn">✕</button>
+              </div>
+              <h2 style="font-family: var(--font-display); color: #fef08a; margin: 4px 0;">Scan to Play on Mobile</h2>
+              <p class="qr-subtitle">Point your phone's camera at this QR code to launch the game directly on iOS & Android devices!</p>
+              
+              <div class="qr-code-frame">
+                <canvas id="qr-canvas" width="220" height="220" style="display:block; border-radius:8px;"></canvas>
+              </div>
+
+              <div class="qr-url-box">
+                <input type="text" id="qr-url-input" value="https://coffee-zeta-weld.vercel.app/" readonly />
+                <button class="btn-copy" id="qr-copy-btn">📋 Copy</button>
+                <a href="https://coffee-zeta-weld.vercel.app/" target="_blank" rel="noopener noreferrer" class="btn-visit">Open ➔</a>
+              </div>
+
+              <div>
+                <button class="btn-primary" id="qr-continue-btn" style="width: 100%;">Back to Game ▶</button>
               </div>
             </div>
           </div>

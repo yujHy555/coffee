@@ -70,6 +70,7 @@ export class CoffeePlatformerEngine {
     if (this.renderer && this.renderer.setLevel) {
       this.renderer.setLevel(this.currentLevel);
     }
+    sound.setBgmLevel(this.currentLevel);
 
     // Preserve already discovered products across runs if desired, or let nodes show uncollected
     this.level.productNodes.forEach((node) => {
@@ -428,6 +429,51 @@ export class CoffeePlatformerEngine {
     // When a gun is equipped (Black Glock 16mm or Golden Desert Eagle .50)
     if (p.hasBeanGun) {
       if (p.shotCooldown > 0) return;
+
+      if (p.weaponType === 'supa_splat') {
+        // SUPA SPLAT GUN: Pressurized neon espresso-slime slug with high velocity and splat burst!
+        p.shotCooldown = 0.17;
+        p.gunShootTimer = 0.24;
+        p.gunRecoilX = -p.facing * 8;
+        p.vx -= p.facing * 95;
+        this.shakeTimer = 0.05;
+        this.shakeIntensity = 1.8;
+        sound.playSupaSplatShot();
+
+        // Exactly one high-velocity glowing neon splat projectile!
+        this.projectiles.push({
+          x: p.x + p.facing * 44,
+          y: p.y - 4,
+          vx: p.facing * 920,
+          vy: 0,
+          r: 11,
+          life: 1.5,
+          isBeanProjectile: true,
+          isSupaSplat: true,
+          rot: 0,
+          rotSpeed: 0,
+          pierce: 2
+        });
+
+        // Juicy neon pink & cyan splash muzzle bursts
+        for (let s = 0; s < 5; s++) {
+          this.particles.push({
+            x: p.x + p.facing * 46,
+            y: p.y - 4 + (Math.random() - 0.5) * 8,
+            vx: p.facing * (120 + Math.random() * 160),
+            vy: (Math.random() - 0.5) * 80,
+            r: 3 + Math.random() * 3.5,
+            color: Math.random() < 0.6 ? '#f43f5e' : '#06b6d4',
+            life: 0.22,
+            maxLife: 0.22,
+            gravity: 40
+          });
+        }
+
+        this.impulseScale(1.32, 0.76, -2.2);
+        this.syncHud();
+        return;
+      }
 
       const isDeagle = p.weaponType === 'golden_deagle';
 
@@ -838,64 +884,71 @@ export class CoffeePlatformerEngine {
           p.vx = Math.min(p.vx + 2900 * dt, flightMaxSpeed);
         }
 
-        // Dynamic flight lean & micro-vibration
+        // Dynamic flight lean (silky smooth, zero camera jitter!)
         p.tiltAngle += (p.facing * 0.24 - p.tiltAngle) * Math.min(1, 14 * dt);
-        this.shakeTimer = 0.04;
-        this.shakeIntensity = 1.35;
+
+        // Cap active particles to prevent any GC spikes or frame drops
+        if (this.particles.length > 36) {
+          this.particles.splice(0, this.particles.length - 36);
+        }
 
         // Spawn dual rocket exhaust particle streams (left nozzle & right nozzle on the back)
-        for (let nozzle = -1; nozzle <= 1; nozzle += 2) {
-          const nozX = p.x - p.facing * 14 + nozzle * 6;
-          const nozY = p.y + 12;
+        if (Math.random() < 0.75) {
+          for (let nozzle = -1; nozzle <= 1; nozzle += 2) {
+            const nozX = p.x - p.facing * 14 + nozzle * 6;
+            const nozY = p.y + 12;
 
-          // Hot fiery core plasma particles
-          this.particles.push({
-            x: nozX + (Math.random() - 0.5) * 4,
-            y: nozY,
-            vx: -p.vx * 0.15 + (Math.random() - 0.5) * 40,
-            vy: 420 + Math.random() * 220,
-            r: 3 + Math.random() * 4,
-            color: Math.random() < 0.4 ? '#ffffff' : Math.random() < 0.75 ? '#fde047' : '#f97316',
-            life: 0.16 + Math.random() * 0.12,
-            maxLife: 0.28,
-            gravity: 120
-          });
-
-          // Billowing espresso steam clouds
-          if (Math.random() < 0.45) {
+            // Hot fiery core plasma particles
             this.particles.push({
-              x: nozX + (Math.random() - 0.5) * 6,
-              y: nozY + 10,
-              vx: -p.vx * 0.1 + (Math.random() - 0.5) * 50,
-              vy: 240 + Math.random() * 140,
-              r: 5 + Math.random() * 7,
-              color: 'rgba(254, 243, 199, 0.5)',
-              life: 0.32 + Math.random() * 0.18,
-              maxLife: 0.5,
-              gravity: -40
+              x: nozX + (Math.random() - 0.5) * 3,
+              y: nozY,
+              vx: -p.vx * 0.15 + (Math.random() - 0.5) * 30,
+              vy: 400 + Math.random() * 180,
+              r: 2.8 + Math.random() * 3.5,
+              color: Math.random() < 0.4 ? '#ffffff' : Math.random() < 0.75 ? '#fde047' : '#f97316',
+              life: 0.14 + Math.random() * 0.1,
+              maxLife: 0.24,
+              gravity: 100
             });
+
+            // Billowing espresso steam clouds
+            if (Math.random() < 0.35) {
+              this.particles.push({
+                x: nozX + (Math.random() - 0.5) * 5,
+                y: nozY + 8,
+                vx: -p.vx * 0.1 + (Math.random() - 0.5) * 40,
+                vy: 220 + Math.random() * 120,
+                r: 4 + Math.random() * 5,
+                color: 'rgba(254, 243, 199, 0.45)',
+                life: 0.28 + Math.random() * 0.14,
+                maxLife: 0.42,
+                gravity: -30
+              });
+            }
           }
         }
 
-        // Check ground proximity blowback puffs
-        for (const plat of this.level.platforms) {
-          if (p.x >= plat.x - 20 && p.x <= plat.x + plat.w + 20) {
-            const surfY = this.getPlatformSurfaceY(plat, p.x, this.time);
-            const distToPlat = surfY - p.y;
-            if (distToPlat > 0 && distToPlat < 110) {
-              if (Math.random() < 0.5) {
+        // Check ground proximity blowback puffs (optimized single-platform lookup)
+        if (p.y > 200 && Math.random() < 0.4) {
+          for (let i = 0; i < this.level.platforms.length; i++) {
+            const plat = this.level.platforms[i];
+            if (p.x >= plat.x - 16 && p.x <= plat.x + plat.w + 16) {
+              const surfY = this.getPlatformSurfaceY(plat, p.x, this.time);
+              const distToPlat = surfY - p.y;
+              if (distToPlat > 0 && distToPlat < 95) {
                 this.particles.push({
-                  x: p.x + (Math.random() - 0.5) * 28,
+                  x: p.x + (Math.random() - 0.5) * 24,
                   y: surfY - 2,
-                  vx: (Math.random() - 0.5) * 160,
-                  vy: -30 - Math.random() * 40,
-                  r: 3.5 + Math.random() * 5,
-                  color: 'rgba(253, 230, 138, 0.65)',
-                  life: 0.22,
-                  maxLife: 0.22,
+                  vx: (Math.random() - 0.5) * 140,
+                  vy: -25 - Math.random() * 35,
+                  r: 3 + Math.random() * 4,
+                  color: 'rgba(253, 230, 138, 0.6)',
+                  life: 0.18,
+                  maxLife: 0.18,
                   gravity: 20
                 });
               }
+              break; // Nearest platform evaluated, done!
             }
           }
         }
@@ -1342,7 +1395,11 @@ export class CoffeePlatformerEngine {
             sound.playProductUnlock();
             this.impulseScale(1.36, 0.74, 3.8);
 
-            if (p.weaponType === 'golden_deagle') {
+            if (p.weaponType === 'supa_splat') {
+              this.addFloatingText(pickup.x, pickup.y - 38, '💥 SUPA SPLAT GUN! 💥', '#ec4899');
+              this.addFloatingText(pickup.x, pickup.y - 14, '[X] / [CLICK] TO BLAST NEON SLUGS!', '#38bdf8');
+              this.spawnPinkGooExplosion(pickup.x, pickup.y, 16, 220);
+            } else if (p.weaponType === 'golden_deagle') {
               this.addFloatingText(pickup.x, pickup.y - 38, '★ GOLDEN DESERT EAGLE .50! ★', '#facc15');
               this.addFloatingText(pickup.x, pickup.y - 14, '[X] / [CLICK] TO FIRE HEAVY SLUG!', '#fef08a');
               this.spawnPinkGooExplosion(pickup.x, pickup.y, 16, 200);
@@ -1627,10 +1684,10 @@ export class CoffeePlatformerEngine {
 
       if (de.timer >= de.duration && !de.exploded) {
         de.exploded = true;
-        this.spawnPinkGooExplosion(de.x, de.y, 16, 360);
+        this.spawnPinkGooExplosion(de.x, de.y, 14, 320);
         sound.playEnemyDefeat();
-        this.shakeTimer = 0.22;
-        this.shakeIntensity = 7.5;
+        this.shakeTimer = 0.08;
+        this.shakeIntensity = 2.4;
       }
 
       if (de.timer >= de.duration + 0.08) {
@@ -1886,17 +1943,18 @@ export class CoffeePlatformerEngine {
     // 12. Pink Goo Particles & Splat Shockwaves
     this.renderer.drawPinkGooParticles(this.pinkGooParticles, this.splatBursts, camX);
 
-    // 13. Regular Particles (Steam, Crema Splashes, Sugar Sparks)
-    for (const pt of this.particles) {
+    // 13. Regular Particles (Steam, Crema Splashes, Sugar Sparks) - Optimized 60FPS loop
+    for (let i = 0; i < this.particles.length; i++) {
+      const pt = this.particles[i];
       const sx = pt.x - camX;
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, pt.life / pt.maxLife);
+      if (sx < -25 || sx > this.width + 25) continue;
+      ctx.globalAlpha = Math.max(0, Math.min(1, pt.life / pt.maxLife));
       ctx.fillStyle = pt.color;
       ctx.beginPath();
       ctx.arc(sx, pt.y, pt.r, 0, Math.PI * 2);
       ctx.fill();
-      ctx.restore();
     }
+    ctx.globalAlpha = 1;
 
     // 14. Foreground Swirling Milk Rapids & Boiling Crema Waves
     this.renderer.drawForegroundLiquidAndFrame(camX, this.time, this.level.liquidLevel);

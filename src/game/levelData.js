@@ -524,9 +524,9 @@ export function createLevel3Data() {
       collected: false
     },
     {
-      id: 'golden-deagle-sky-arsenal',
-      type: 'golden_deagle',
-      name: 'Golden Desert Eagle .50',
+      id: 'supa-splat-sky-arsenal',
+      type: 'supa_splat',
+      name: 'Supa Splat Gun',
       x: 2180,
       y: 332,
       collected: false
