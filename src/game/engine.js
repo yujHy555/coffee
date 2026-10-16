@@ -548,6 +548,9 @@ export class CoffeePlatformerEngine {
     // Update Enemies (Coffee Bean Grunt, Sugar Cube Hopper, Steam Cloud Spirit)
     for (const enemy of this.level.enemies) {
       if (enemy.dead) continue;
+      if (enemy.type === 'sugar_hopper') {
+        enemy.vx = (enemy.vx >= 0 ? 1 : -1) * 180;
+      }
       enemy.x += enemy.vx * dt;
       if (enemy.x < enemy.minX) {
         enemy.x = enemy.minX;

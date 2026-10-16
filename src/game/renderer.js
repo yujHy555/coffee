@@ -1109,17 +1109,19 @@ export class WorldRenderer {
 
     const ctx = this.ctx;
     const facing = enemy.vx >= 0 ? 1 : -1;
-    const walkCycle = Math.sin(time * 11 + enemy.x * 0.04);
+    const seed = parseInt(enemy.id?.replace(/\D/g, '') || '1', 10);
+    const walkCycle = Math.sin(time * 13 + seed * 1.7);
 
     ctx.save();
     ctx.translate(sx, enemy.y);
 
-    // Warm ground contact shadow underneath enemy (Matches Character Design Sheet!)
-    const shadowY = enemy.type === 'steam_spirit' ? 30 : 28;
-    ctx.fillStyle = 'rgba(42, 18, 6, 0.28)';
-    ctx.beginPath();
-    ctx.ellipse(0, shadowY, 24, 5.5, 0, 0, Math.PI * 2);
-    ctx.fill();
+    // Warm ground contact shadow underneath grounded enemies only (No shadow for Steam Cloud Spirit ghosts!)
+    if (enemy.type !== 'steam_spirit') {
+      ctx.fillStyle = 'rgba(42, 18, 6, 0.28)';
+      ctx.beginPath();
+      ctx.ellipse(0, 28, 24, 5.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     ctx.scale(facing, 1);
 
@@ -1306,7 +1308,7 @@ export class WorldRenderer {
       // fist, trailing back arm, and Red-and-White Striped Sneakers!
       // =========================================================================
       const outlineCol = '#4A2512';
-      const hopY = Math.abs(Math.sin(time * 7.5 + enemy.x * 0.03)) * -10;
+      const hopY = Math.abs(Math.sin(time * 9 + seed * 1.3)) * -10;
       ctx.translate(0, hopY);
 
       // Speed / Hop motion lines behind cube (as shown in sheet!)

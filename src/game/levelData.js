@@ -136,7 +136,7 @@ export function createLevelData() {
       y: 484,
       minX: 1320,
       maxX: 1630,
-      vx: -125,
+      vx: -180,
       hp: 1,
       maxHp: 1
     },
@@ -170,7 +170,7 @@ export function createLevelData() {
       y: 474,
       minX: 2680,
       maxX: 2950,
-      vx: -135,
+      vx: -180,
       hp: 2,
       maxHp: 2
     },
@@ -182,7 +182,7 @@ export function createLevelData() {
       y: 444,
       minX: 3380,
       maxX: 3660,
-      vx: -95,
+      vx: -180,
       hp: 2,
       maxHp: 2
     },
@@ -205,7 +205,7 @@ export function createLevelData() {
       y: 429,
       minX: 5080,
       maxX: 5360,
-      vx: -110,
+      vx: -180,
       hp: 2,
       maxHp: 2
     },
