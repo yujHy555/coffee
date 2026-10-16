@@ -1799,8 +1799,8 @@ export class WorldRenderer {
 
     // Dangling boot angle: toes point loosely downward and swing like a pendulum in the air!
     const airToeDangle = airBlend * (0.38 + Math.max(-0.22, Math.min(0.32, -(player.vy || 0) * 0.0005)));
-    const leftBootAngle = -runSwing * 0.42 * (1 - idleBlend) * (1 - airBlend) + airToeDangle - airFlutter * 0.65;
-    const rightBootAngle = runSwing * 0.42 * (1 - idleBlend) * (1 - airBlend) + airToeDangle + airFlutter * 0.65;
+    const leftBootAngle = -runSwing * 0.42 * (1 - idleBlend) * (1 - airBlend) + airToeDangle - armFlutter * 0.65;
+    const rightBootAngle = runSwing * 0.42 * (1 - idleBlend) * (1 - airBlend) + airToeDangle + armFlutter * 0.65;
 
     // Left / Standing or Back Dangling Boot
     this.drawCupBoot(
