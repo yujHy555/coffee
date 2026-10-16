@@ -2197,17 +2197,19 @@ export class WorldRenderer {
       ctx.beginPath();
       ctx.moveTo(0, -7);
       ctx.lineTo(0, 7);
-      ctx.stroke();
       ctx.restore();
     }
 
     ctx.restore(); // end cup body + face group
     ctx.restore(); // end hipShift group
 
-    // --- 8. Near/Right Arm (In IDLE: Hand on waist! In AIR: Dangles loosely! When moving/attacking: swings or slashes!) ---
+    // --- 8. Near/Right Arm (Holding Bean Blaster Gun when equipped, Spoon when meleeing, or swinging/waist) ---
     ctx.save();
     const spoonUpgraded = unlockedPowerups.has('silver_spoon');
-    if (idleBlend > 0.5 && !isAction && player.meleeTimer <= 0) {
+    const isShooting = (player.gunShootTimer || 0) > 0;
+    const hasGun = Boolean(player.hasBeanGun);
+
+    if (idleBlend > 0.5 && !isAction && player.meleeTimer <= 0 && !isShooting && !hasGun) {
       // Right arm bent akimbo with hand planted firmly on the right waist/hip of the cup!
       this.drawWaistArm(ctx, 1, tapLift, hipShiftX, hipBobY);
     } else {
@@ -2225,7 +2227,11 @@ export class WorldRenderer {
         -runSwing * 0.42 * (1 - airBlend) - armFlutter * 1.15,
         airBlend,
         armDangleY,
-        limbLagX
+        limbLagX,
+        hasGun,
+        isShooting,
+        player.gunShootTimer || 0,
+        player.gunRecoilX || 0
       );
     }
     ctx.restore();
@@ -2288,7 +2294,11 @@ export class WorldRenderer {
     walkSwing = 0,
     airBlend = 0,
     armDangleY = 0,
-    limbLagX = 0
+    limbLagX = 0,
+    hasGun = false,
+    isShooting = false,
+    gunShootTimer = 0,
+    gunRecoilX = 0
   ) {
     const limbCol = '#522915';
     const outlineCol = '#3A1B0C';
@@ -2328,6 +2338,47 @@ export class WorldRenderer {
       ctx.beginPath();
       ctx.arc(0, 0, spoonUpgraded ? 48 : 35, -1.25, 1.15);
       ctx.stroke();
+    } else if (hasGun) {
+      // =========================================================================
+      // EQUIPPED BEAN BLASTER GUN (Shooting stance with recoil & muzzle flash)
+      // =========================================================================
+      const recoilProg = isShooting ? gunShootTimer / 0.22 : 0;
+      const kickX = -recoilProg * 6;
+      const kickAngle = -recoilProg * 0.22;
+      const armAngle = isShooting ? -0.12 + kickAngle : 0.22 + walkSwing * 0.3;
+
+      ctx.rotate(armAngle);
+      ctx.translate(kickX, 0);
+
+      // Arm reaching forward holding gun
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 3.6;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(8, isShooting ? -2 : 3, 16, isShooting ? -4 : 6);
+      ctx.stroke();
+
+      ctx.strokeStyle = limbCol;
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(8, isShooting ? -2 : 3, 16, isShooting ? -4 : 6);
+      ctx.stroke();
+
+      // Hand grasping gun grip
+      const handX = 16;
+      const handY = isShooting ? -4 : 6;
+      ctx.fillStyle = limbCol;
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(handX, handY, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Draw the Bean Blaster Gun!
+      this.drawBeanBlasterGun(ctx, handX, handY, isShooting, recoilProg);
     } else if (isWaving) {
       // Raised Waving / Reaching 4-Finger Hand that dangles & trails loosely in mid-air!
       ctx.rotate(walkSwing * 0.45);
@@ -2677,5 +2728,399 @@ export class WorldRenderer {
     }
 
     ctx.restore();
+  }
+
+  // =========================================================================
+  // BEAN BLASTER GUN, WEAPON PICKUPS, BEAN PROJECTILES & PINK GOO SPLAT RENDERERS
+  // =========================================================================
+
+  drawBeanBlasterGun(ctx, x, y, isShooting, recoilProg) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(isShooting ? -0.05 : -0.28);
+
+    const outlineCol = '#2D1407';
+
+    // 1. Sleek Porcelain Gun Handle & Body (#FFF6E8)
+    ctx.fillStyle = '#FFF6E8';
+    ctx.strokeStyle = outlineCol;
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.roundRect(-4, 0, 7, 10, 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // 2. Brass Receiver Frame & Trigger Guard
+    ctx.fillStyle = '#E89A3C';
+    ctx.beginPath();
+    ctx.roundRect(0, -5, 16, 8, 2.5);
+    ctx.fill();
+    ctx.stroke();
+
+    // Trigger loop
+    ctx.strokeStyle = outlineCol;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(4, 3, 3, 0, Math.PI * 0.85);
+    ctx.stroke();
+
+    // 3. Clear Glass Coffee Bean Magazine Hopper on Top (with mini roasted beans inside!)
+    ctx.fillStyle = 'rgba(186, 230, 253, 0.45)';
+    ctx.strokeStyle = '#38BDF8';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.roundRect(4, -12, 10, 7, 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Mini roasted coffee beans visible inside the glass magazine hopper
+    ctx.fillStyle = '#6E381D';
+    ctx.beginPath();
+    ctx.ellipse(7.5, -8.5, 2.2, 1.4, 0.2, 0, Math.PI * 2);
+    ctx.ellipse(10.5, -8.5, 2.0, 1.3, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Golden magazine cap
+    ctx.fillStyle = '#FDE047';
+    ctx.strokeStyle = outlineCol;
+    ctx.lineWidth = 1.0;
+    ctx.fillRect(5, -14, 8, 2.2);
+    ctx.strokeRect(5, -14, 8, 2.2);
+
+    // 4. Ribbed Polished Brass Barrel & Ruby Nozzle
+    ctx.fillStyle = '#F59E0B';
+    ctx.strokeStyle = outlineCol;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.roundRect(14, -4, 13, 6, 1.5);
+    ctx.fill();
+    ctx.stroke();
+
+    // Ruby Nozzle Ring
+    ctx.fillStyle = '#E11D48';
+    ctx.beginPath();
+    ctx.roundRect(26, -5, 3.5, 8, 1.2);
+    ctx.fill();
+    ctx.stroke();
+
+    // 5. Muzzle Flash Starburst & Energy Discharge (when actively shooting!)
+    if (isShooting && recoilProg > 0.05) {
+      const flashAlpha = Math.min(1, recoilProg * 1.5);
+      const flashScale = 0.8 + recoilProg * 0.8;
+      ctx.save();
+      ctx.translate(32, -1);
+      ctx.scale(flashScale, flashScale);
+
+      // Expanding pink-golden shock ring
+      ctx.strokeStyle = `rgba(244, 114, 182, ${flashAlpha * 0.85})`;
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.arc(0, 0, 9 + (1 - recoilProg) * 6, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Bright 8-pointed cartoon muzzle flash star
+      this.drawFourPointSparkle(0, 0, 15, `rgba(253, 224, 71, ${flashAlpha})`);
+      ctx.rotate(Math.PI / 4);
+      this.drawFourPointSparkle(0, 0, 11, `rgba(244, 114, 182, ${flashAlpha * 0.9})`);
+
+      // Core white flash
+      ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
+      ctx.beginPath();
+      ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
+  drawWeaponPickup(pickup, cameraX, time) {
+    if (pickup.collected) return;
+    const sx = pickup.x - cameraX;
+    if (sx < -80 || sx > this.width + 80) return;
+
+    const ctx = this.ctx;
+    const bob = Math.sin(time * 3.8 + pickup.x * 0.01) * 6;
+    const tilt = Math.sin(time * 2.2) * 0.12;
+
+    ctx.save();
+    ctx.translate(sx, pickup.y + bob);
+
+    // Radiant pink-and-golden collectible aura
+    const aura = ctx.createRadialGradient(0, 0, 4, 0, 0, 32);
+    aura.addColorStop(0, 'rgba(244, 114, 182, 0.75)');
+    aura.addColorStop(0.55, 'rgba(251, 191, 36, 0.35)');
+    aura.addColorStop(1, 'rgba(244, 114, 182, 0)');
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(0, 0, 32, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Rotating 4-point golden sparkles
+    ctx.save();
+    ctx.rotate(time * 1.4);
+    for (let i = 0; i < 4; i++) {
+      ctx.rotate(Math.PI / 2);
+      this.drawFourPointSparkle(0, -22, 6, '#fde047');
+    }
+    ctx.restore();
+
+    // Floating 3D Gun Display
+    ctx.save();
+    ctx.rotate(tilt);
+    ctx.scale(1.4, 1.4);
+    this.drawBeanBlasterGun(ctx, -12, 0, false, 0);
+    ctx.restore();
+
+    // Floating Label Pill: "★ BEAN BLASTER ★"
+    ctx.fillStyle = 'rgba(28, 14, 7, 0.88)';
+    ctx.strokeStyle = '#f472b6';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.roundRect(-58, -38, 116, 19, 9);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#fde047';
+    ctx.font = 'bold 10px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('★ BEAN BLASTER ★', 0, -25);
+
+    ctx.restore();
+  }
+
+  drawBeanProjectile(proj, cameraX, time) {
+    const sx = proj.x - cameraX;
+    if (sx < -30 || sx > this.width + 30) return;
+
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(sx, proj.y);
+
+    // Golden & pink energy comet streak behind the flying bean
+    const dir = Math.sign(proj.vx) || 1;
+    const streakGrad = ctx.createLinearGradient(0, 0, -dir * 32, 0);
+    streakGrad.addColorStop(0, 'rgba(244, 114, 182, 0.85)');
+    streakGrad.addColorStop(0.5, 'rgba(253, 224, 71, 0.65)');
+    streakGrad.addColorStop(1, 'rgba(244, 114, 182, 0)');
+    ctx.fillStyle = streakGrad;
+    ctx.beginPath();
+    ctx.moveTo(0, -6);
+    ctx.lineTo(0, 6);
+    ctx.lineTo(-dir * 32, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    // Rotate the 3D roasted coffee bean
+    ctx.rotate(proj.rot || 0);
+
+    // Roasted Coffee Bean Body
+    const beanGrad = ctx.createLinearGradient(-7, -8, 7, 8);
+    beanGrad.addColorStop(0, '#9A4824');
+    beanGrad.addColorStop(0.5, '#683018');
+    beanGrad.addColorStop(1, '#3B170B');
+
+    ctx.fillStyle = beanGrad;
+    ctx.strokeStyle = '#240C04';
+    ctx.lineWidth = 2.0;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 7.8, 10.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // S-curve center crease
+    ctx.strokeStyle = '#1D0A03';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(-1, -7.5);
+    ctx.bezierCurveTo(-3.5, -2, 3.5, 2, 1, 7.5);
+    ctx.stroke();
+
+    // Glossy catchlight shine
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+    ctx.beginPath();
+    ctx.ellipse(-2.8, -3.2, 1.8, 3.5, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  drawPinkGooSplats(splats, cameraX) {
+    if (!splats || splats.length === 0) return;
+    const ctx = this.ctx;
+
+    for (const splat of splats) {
+      const sx = splat.x - cameraX;
+      if (sx < -50 || sx > this.width + 50) continue;
+
+      const alpha = Math.min(1, splat.life / 1.5);
+      ctx.save();
+      ctx.translate(sx, splat.y);
+      ctx.globalAlpha = alpha;
+
+      // Glossy pink puddle
+      ctx.fillStyle = splat.color || '#ec4899';
+      ctx.strokeStyle = '#be185d';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, splat.rx, splat.ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Dripping blobs hanging over platform edge
+      ctx.beginPath();
+      ctx.arc(-splat.rx * 0.45, splat.ry * 0.7, splat.ry * 0.6, 0, Math.PI * 2);
+      ctx.arc(splat.rx * 0.4, splat.ry * 0.8, splat.ry * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Specular highlight gleam on the puddle surface
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+      ctx.beginPath();
+      ctx.ellipse(-splat.rx * 0.28, -splat.ry * 0.25, splat.rx * 0.35, splat.ry * 0.35, -0.15, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+  }
+
+  drawDyingEnemy(de, cameraX, time) {
+    const sx = de.x - cameraX;
+    if (sx < -100 || sx > this.width + 100) return;
+
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(sx, de.y);
+
+    // Violent shaking trembling from internal cartoon pressure!
+    const shakeX = (Math.random() - 0.5) * 8;
+    const shakeY = (Math.random() - 0.5) * 8;
+    ctx.translate(shakeX, shakeY);
+
+    ctx.scale(de.facing, 1);
+    ctx.rotate(de.tiltAngle || 0);
+    ctx.scale(de.scaleX, de.scaleY);
+
+    // Pink goo aura oozing out of seams
+    ctx.shadowColor = '#f472b6';
+    ctx.shadowBlur = 18;
+
+    // Delegate to standard drawEnemy styling, but with giant cartoon swell, dizzy spiral "X X" eyes, and bulging cheeks!
+    const dummyEnemy = {
+      type: de.type,
+      x: 0,
+      y: 0,
+      vx: de.facing,
+      hp: 0,
+      dead: false,
+      animPhase: time * 20,
+      hitFlashTimer: 0.1,
+      aggro: false,
+      scaleX: 1,
+      scaleY: 1,
+      tiltAngle: 0
+    };
+
+    // Draw the swelling cartoon body
+    ctx.save();
+    ctx.filter = 'saturate(1.4) brightness(1.15)';
+    this.drawEnemy(dummyEnemy, 0, time);
+    ctx.restore();
+
+    // Overlay giant cartoon knock-out "X X" eyes on top!
+    ctx.strokeStyle = '#ec4899';
+    ctx.lineWidth = 3.6;
+    ctx.lineCap = 'round';
+
+    const drawXEye = (ex, ey) => {
+      ctx.beginPath();
+      ctx.moveTo(ex - 5, ey - 5);
+      ctx.lineTo(ex + 5, ey + 5);
+      ctx.moveTo(ex + 5, ey - 5);
+      ctx.lineTo(ex - 5, ey + 5);
+      ctx.stroke();
+    };
+
+    drawXEye(2, -4);
+    drawXEye(13, -5);
+
+    // Sweating comic droplets
+    ctx.fillStyle = '#67e8f9';
+    ctx.beginPath();
+    ctx.arc(-14, -18, 3.2, 0, Math.PI * 2);
+    ctx.arc(18, -16, 2.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  drawPinkGooParticles(particles, splatBursts, cameraX) {
+    const ctx = this.ctx;
+
+    // 1. Splat shockwave rings
+    if (splatBursts) {
+      for (const sb of splatBursts) {
+        const sx = sb.x - cameraX;
+        if (sx < -100 || sx > this.width + 100) continue;
+        const alpha = Math.min(1, sb.life / sb.maxLife);
+        ctx.save();
+        ctx.translate(sx, sb.y);
+        ctx.strokeStyle = `rgba(236, 72, 153, ${alpha * 0.9})`;
+        ctx.lineWidth = 3.2;
+        ctx.beginPath();
+        ctx.arc(0, 0, sb.currentR || sb.r, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Radiating star spikes
+        ctx.strokeStyle = `rgba(251, 207, 232, ${alpha * 0.75})`;
+        ctx.lineWidth = 2.2;
+        for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+          const r1 = (sb.currentR || sb.r) * 0.85;
+          const r2 = (sb.currentR || sb.r) * 1.35;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(a) * r1, Math.sin(a) * r1);
+          ctx.lineTo(Math.cos(a) * r2, Math.sin(a) * r2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }
+
+    // 2. Glossy pink goo droplets & flying globules
+    if (particles) {
+      for (const pt of particles) {
+        const sx = pt.x - cameraX;
+        if (sx < -40 || sx > this.width + 40) continue;
+        const alpha = Math.max(0, Math.min(1, pt.life / (pt.maxLife * 0.5)));
+
+        ctx.save();
+        ctx.translate(sx, pt.y);
+        ctx.globalAlpha = alpha;
+
+        // Stretch along velocity vector
+        const speed = Math.hypot(pt.vx, pt.vy);
+        const angle = Math.atan2(pt.vy, pt.vx);
+        ctx.rotate(angle);
+
+        const stretch = Math.min(2.4, 1 + speed / 280);
+        ctx.fillStyle = pt.color;
+        ctx.strokeStyle = '#9d174d';
+        ctx.lineWidth = 1.2;
+
+        ctx.beginPath();
+        ctx.ellipse(0, 0, pt.r * stretch, pt.r * (2 - stretch * 0.5), 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Specular highlight catchlight
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.beginPath();
+        ctx.arc(pt.r * stretch * 0.3, -pt.r * 0.3, Math.max(1, pt.r * 0.32), 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      }
+    }
   }
 }

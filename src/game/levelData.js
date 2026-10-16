@@ -262,6 +262,24 @@ export function createLevelData() {
     }
   ];
 
+  // Collectible Espresso Bean Blaster Gun Pickups placed right on the starting terrace and Zone 2 checkpoint!
+  const weaponPickups = [
+    {
+      id: 'bean-blaster-starter',
+      name: 'Espresso Bean Blaster',
+      x: 285,
+      y: 452,
+      collected: false
+    },
+    {
+      id: 'bean-blaster-zone2',
+      name: 'Golden Rapid Bean Blaster',
+      x: 3460,
+      y: 420,
+      collected: false
+    }
+  ];
+
   return {
     width: 7250,
     height: 640,
@@ -269,6 +287,7 @@ export function createLevelData() {
     platforms,
     beans,
     enemies,
-    productNodes
+    productNodes,
+    weaponPickups
   };
 }

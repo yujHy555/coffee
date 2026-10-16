@@ -95,19 +95,20 @@ class SoundManager {
     if (!this.ctx) return;
 
     const now = this.ctx.currentTime;
+    // Crisp pneumatic bean-blaster pop!
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(480, now);
-    osc.frequency.exponentialRampToValueAtTime(160, now + 0.11);
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(620, now);
+    osc.frequency.exponentialRampToValueAtTime(145, now + 0.09);
 
-    gain.gain.setValueAtTime(0.1, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
 
     osc.connect(gain);
     gain.connect(this.ctx.destination);
     osc.start(now);
-    osc.stop(now + 0.13);
+    osc.stop(now + 0.11);
   }
 
   playEnemyDefeat() {
@@ -116,20 +117,37 @@ class SoundManager {
     if (!this.ctx) return;
 
     const now = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(220, now);
-    osc.frequency.exponentialRampToValueAtTime(520, now + 0.08);
-    osc.frequency.exponentialRampToValueAtTime(140, now + 0.22);
 
-    gain.gain.setValueAtTime(0.22, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.23);
+    // 1. High-impact cartoon inflation POP!
+    const popOsc = this.ctx.createOscillator();
+    const popGain = this.ctx.createGain();
+    popOsc.type = 'sine';
+    popOsc.frequency.setValueAtTime(190, now);
+    popOsc.frequency.exponentialRampToValueAtTime(680, now + 0.065);
+    popOsc.frequency.exponentialRampToValueAtTime(110, now + 0.19);
+    popGain.gain.setValueAtTime(0.24, now);
+    popGain.gain.exponentialRampToValueAtTime(0.001, now + 0.21);
+    popOsc.connect(popGain);
+    popGain.connect(this.ctx.destination);
+    popOsc.start(now);
+    popOsc.stop(now + 0.22);
 
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.24);
+    // 2. Juicy bubbly pink-goo SPLAT cascade!
+    const splatFreqs = [420, 560, 310, 490, 240];
+    splatFreqs.forEach((f, idx) => {
+      const t = now + 0.04 + idx * 0.032;
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(f, t);
+      osc.frequency.exponentialRampToValueAtTime(f * 0.45, t + 0.06);
+      g.gain.setValueAtTime(0.14, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.065);
+      osc.connect(g);
+      g.connect(this.ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.07);
+    });
   }
 
   playSugarCrumble() {

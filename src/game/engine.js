@@ -107,6 +107,9 @@ export class CoffeePlatformerEngine {
       meleeTimer: 0,
       meleeCooldown: 0,
       shotCooldown: 0,
+      hasBeanGun: false, // Picked up Bean Blaster Gun
+      gunShootTimer: 0, // Recoil & shooting pose timer
+      gunRecoilX: 0,
       dashTimer: 0,
       dashCooldown: 0,
       scaleX: 1,
@@ -145,6 +148,10 @@ export class CoffeePlatformerEngine {
     this.currentBiome = 'Starry Espresso Hills';
 
     this.projectiles = [];
+    this.dyingEnemies = [];
+    this.pinkGooParticles = [];
+    this.pinkGooSplats = [];
+    this.splatBursts = [];
     this.particles = [];
     this.floatingTexts = [];
 
@@ -176,6 +183,12 @@ export class CoffeePlatformerEngine {
         }
       }
     });
+
+    // Tap/Click on canvas to fire the Bean Blaster or Espresso Shot
+    this.canvas.addEventListener('pointerdown', (e) => {
+      if (this.paused) return;
+      this.triggerEspressoShot();
+    });
   }
 
   // Triggered by keyboard or mobile touch buttons
@@ -191,8 +204,8 @@ export class CoffeePlatformerEngine {
     if (code === 'KeyZ' || code === 'KeyJ') {
       this.triggerSpoonMelee();
     }
-    // Espresso Shot: KeyX / KeyK
-    if (code === 'KeyX' || code === 'KeyK') {
+    // Espresso Shot / Bean Blaster Fire: KeyX / KeyK / Enter / NumpadEnter
+    if (code === 'KeyX' || code === 'KeyK' || code === 'Enter' || code === 'NumpadEnter') {
       this.triggerEspressoShot();
     }
     // Frothy Dash: ShiftLeft / ShiftRight / KeyC / KeyL
@@ -333,6 +346,56 @@ export class CoffeePlatformerEngine {
 
   triggerEspressoShot() {
     const p = this.player;
+
+    // When Bean Blaster Gun is equipped, fire rapid-action roasted coffee beans!
+    if (p.hasBeanGun) {
+      if (p.shotCooldown > 0) return;
+      p.shotCooldown = 0.16;
+      p.gunShootTimer = 0.22;
+      p.gunRecoilX = -p.facing * 7;
+      p.vx -= p.facing * 75; // Snappy gunslinger recoil
+      sound.playEspressoShot();
+
+      const isTriple = this.unlockedPowerups.has('triple_shot');
+      const spreads = isTriple ? [-85, 0, 85] : [0];
+
+      spreads.forEach((vySpread) => {
+        this.projectiles.push({
+          x: p.x + p.facing * 40,
+          y: p.y - 2,
+          vx: p.facing * 840,
+          vy: vySpread + (Math.random() - 0.5) * 35,
+          r: 9,
+          life: 1.5,
+          isBeanProjectile: true,
+          rot: Math.random() * Math.PI * 2,
+          rotSpeed: p.facing * (18 + Math.random() * 8),
+          pierce: isTriple ? 2 : 1
+        });
+      });
+
+      // Muzzle flash sparks & smoke at the barrel tip
+      for (let s = 0; s < 6; s++) {
+        this.particles.push({
+          x: p.x + p.facing * 44,
+          y: p.y - 2 + (Math.random() - 0.5) * 8,
+          vx: p.facing * (110 + Math.random() * 150),
+          vy: (Math.random() - 0.5) * 60,
+          r: 2.2 + Math.random() * 3.4,
+          color: Math.random() < 0.5 ? '#fbcfe8' : '#fde047',
+          life: 0.22,
+          maxLife: 0.22,
+          gravity: 50
+        });
+      }
+
+      // Satisfying firing squash
+      this.impulseScale(1.28, 0.82, -1.8);
+      this.syncHud();
+      return;
+    }
+
+    // Default espresso shot before collecting the Bean Blaster Gun
     if (p.shotCooldown > 0 || p.caffeine < 8) return;
 
     p.caffeine = Math.max(0, p.caffeine - 8);
@@ -350,7 +413,8 @@ export class CoffeePlatformerEngine {
         vy: vySpread,
         r: isTriple ? 9 : 7,
         pierce: isTriple ? 2 : 1,
-        life: 1.3
+        life: 1.3,
+        isBeanProjectile: false
       });
     });
 
@@ -415,21 +479,79 @@ export class CoffeePlatformerEngine {
     });
   }
 
-  damageEnemy(enemy, dmg, knockbackVx = 0) {
+  spawnPinkGooExplosion(x, y, count = 34, maxSpeed = 380) {
+    // 1. Comic splat shockwave ring
+    this.splatBursts.push({
+      x,
+      y,
+      r: 8,
+      maxR: 54,
+      life: 0.35,
+      maxLife: 0.35,
+      color: '#ec4899'
+    });
+
+    // 2. High-energy glossy pink goo droplets & globules flying in all directions
+    const pinkShades = ['#ec4899', '#f472b6', '#db2777', '#fbcfe8', '#f43f5e', '#ffffff'];
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 65 + Math.random() * maxSpeed;
+      const color = pinkShades[Math.floor(Math.random() * pinkShades.length)];
+      this.pinkGooParticles.push({
+        x: x + (Math.random() - 0.5) * 16,
+        y: y + (Math.random() - 0.5) * 16,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 80,
+        r: 3.2 + Math.random() * 5.4,
+        color,
+        life: 0.6 + Math.random() * 0.45,
+        maxLife: 1.05,
+        gravity: 520
+      });
+    }
+  }
+
+  damageEnemy(enemy, dmg, knockbackVx = 0, isBeanShot = false) {
+    if (isBeanShot) {
+      dmg = 999; // Lethal 1-shot kill when shot with Bean Blaster
+    }
     enemy.hp -= dmg;
     enemy.hitFlashTimer = 0.2;
-    this.impulseEnemyScale(enemy, 1.42, 0.64, 3.8);
-    this.spawnCoffeeSplash(enemy.x, enemy.y, 12, '#f59e0b');
-    this.shakeTimer = 0.12;
-    this.shakeIntensity = 5;
+    this.impulseEnemyScale(enemy, 1.45, 0.62, 4.0);
+    this.spawnPinkGooExplosion(enemy.x, enemy.y, 14, 180);
+    this.shakeTimer = 0.16;
+    this.shakeIntensity = 6;
 
     if (enemy.hp <= 0) {
       enemy.dead = true;
       sound.playEnemyDefeat();
       this.score += 500;
-      this.player.caffeine = Math.min(100, this.player.caffeine + 18);
-      this.addFloatingText(enemy.x, enemy.y - 20, '+500 ROASTED!', '#fbbf24');
-      this.spawnCoffeeSplash(enemy.x, enemy.y, 20, '#fef08a');
+      this.player.caffeine = Math.min(100, this.player.caffeine + 20);
+
+      // Add to dyingEnemies for super-satisfying cartoon swell, shake and explosive POP!
+      this.dyingEnemies.push({
+        type: enemy.type,
+        x: enemy.x,
+        y: enemy.y,
+        vx: knockbackVx * 0.5,
+        vy: -150,
+        scaleX: enemy.scaleX || 1,
+        scaleY: enemy.scaleY || 1,
+        facing: enemy.vx >= 0 ? 1 : -1,
+        tiltAngle: enemy.tiltAngle || 0,
+        timer: 0,
+        duration: 0.26,
+        exploded: false,
+        groundY: enemy.groundY || enemy.y
+      });
+
+      // Massive explosive pink goo splatter cascade!
+      this.spawnPinkGooExplosion(enemy.x, enemy.y, 38, 420);
+      this.shakeTimer = 0.24;
+      this.shakeIntensity = 8.5;
+
+      this.addFloatingText(enemy.x, enemy.y - 28, '+500 GOO SPLAT!', '#f472b6');
+      this.addFloatingText(enemy.x, enemy.y - 10, 'KER-SPLAT!', '#fbcfe8');
       this.syncHud();
     } else {
       enemy.knockbackVx = knockbackVx;
@@ -803,6 +925,24 @@ export class CoffeePlatformerEngine {
       }
     }
 
+    // Collect Weapon Pickups (Bean Blaster Gun)
+    if (this.level.weaponPickups) {
+      for (const pickup of this.level.weaponPickups) {
+        if (pickup.collected) continue;
+        const dist = Math.hypot(p.x - pickup.x, p.y - pickup.y);
+        if (dist < p.r + 32) {
+          pickup.collected = true;
+          p.hasBeanGun = true;
+          sound.playProductUnlock();
+          this.impulseScale(1.34, 0.76, 3.5);
+          this.addFloatingText(pickup.x, pickup.y - 36, '★ BEAN BLASTER EQUIPPED! ★', '#f472b6');
+          this.addFloatingText(pickup.x, pickup.y - 14, '[X] / [CLICK] TO SHOOT BEANS!', '#fde047');
+          this.spawnPinkGooExplosion(pickup.x, pickup.y, 22, 190);
+          this.syncHud();
+        }
+      }
+    }
+
     // Collect Mystery Product Crates / Pedestals
     for (const node of this.level.productNodes) {
       if (node.collected) continue;
@@ -820,18 +960,21 @@ export class CoffeePlatformerEngine {
       }
     }
 
-    // Update Projectiles (Espresso Shots)
+    // Update Projectiles (Espresso Shots & Spinning Coffee Beans)
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const proj = this.projectiles[i];
       proj.x += proj.vx * dt;
       proj.y += proj.vy * dt;
       proj.life -= dt;
+      if (proj.rotSpeed) proj.rot += proj.rotSpeed * dt;
 
-      // Hit enemies
+      // Hit enemies (instant lethal kill if shot with coffee beans!)
       for (const enemy of this.level.enemies) {
         if (enemy.dead) continue;
-        if (Math.hypot(proj.x - enemy.x, proj.y - enemy.y) < enemy.hp * 4 + 26) {
-          this.damageEnemy(enemy, 1, Math.sign(proj.vx) * 165);
+        const hitRadius = enemy.hp * 4 + 28;
+        if (Math.hypot(proj.x - enemy.x, proj.y - enemy.y) < hitRadius) {
+          const isBean = Boolean(proj.isBeanProjectile);
+          this.damageEnemy(enemy, isBean ? 999 : 1, Math.sign(proj.vx) * 320, isBean);
           proj.pierce--;
           if (proj.pierce <= 0) {
             proj.life = 0;
@@ -1022,6 +1165,96 @@ export class CoffeePlatformerEngine {
       }
     }
 
+    // Weapon recoil and shoot animation timer countdown
+    if (p.gunShootTimer > 0) p.gunShootTimer -= dt;
+    if (p.gunRecoilX !== 0) {
+      p.gunRecoilX *= Math.pow(0.72, dt * 60);
+      if (Math.abs(p.gunRecoilX) < 0.2) p.gunRecoilX = 0;
+    }
+
+    // Update Dying Enemies (Violent cartoon swell, shake with pressure, then explode into pink goo!)
+    for (let i = this.dyingEnemies.length - 1; i >= 0; i--) {
+      const de = this.dyingEnemies[i];
+      de.timer += dt;
+      de.x += de.vx * dt;
+      de.y += de.vy * dt;
+      de.vy += 450 * dt;
+
+      // Swell up rapidly like an over-inflated balloon
+      const progress = Math.min(1, de.timer / de.duration);
+      de.scaleX = 1 + progress * 0.95;
+      de.scaleY = 1 + progress * 0.95;
+      de.tiltAngle += (Math.random() - 0.5) * 0.18;
+
+      if (de.timer >= de.duration && !de.exploded) {
+        de.exploded = true;
+        this.spawnPinkGooExplosion(de.x, de.y, 38, 420);
+        sound.playEnemyDefeat();
+        this.shakeTimer = 0.24;
+        this.shakeIntensity = 8.5;
+      }
+
+      if (de.timer >= de.duration + 0.08) {
+        this.dyingEnemies.splice(i, 1);
+      }
+    }
+
+    // Update Pink Goo Particles (Stretchy droplets & globules that stick to platforms)
+    for (let i = this.pinkGooParticles.length - 1; i >= 0; i--) {
+      const pt = this.pinkGooParticles[i];
+      pt.x += pt.vx * dt;
+      pt.y += pt.vy * dt;
+      pt.vy += pt.gravity * dt;
+      pt.vx *= Math.pow(0.97, dt * 60);
+      pt.life -= dt;
+
+      // Check collision with platform surfaces to spawn persistent pink goo splats
+      for (const plat of this.level.platforms) {
+        if (pt.x >= plat.x && pt.x <= plat.x + plat.w && pt.vy > 0) {
+          const surfY = this.getPlatformSurfaceY(plat, pt.x, this.time);
+          if (pt.y >= surfY - 5 && pt.y <= surfY + 16) {
+            if (this.pinkGooSplats.length < 80) {
+              this.pinkGooSplats.push({
+                x: pt.x,
+                y: surfY,
+                rx: 7 + Math.random() * 12,
+                ry: 2.5 + Math.random() * 3.5,
+                color: pt.color,
+                life: 6.5 + Math.random() * 3.5,
+                maxLife: 10.0
+              });
+            }
+            pt.life = 0;
+            break;
+          }
+        }
+      }
+
+      if (pt.life <= 0) {
+        this.pinkGooParticles.splice(i, 1);
+      }
+    }
+
+    // Update persistent Pink Goo Splats on platforms
+    for (let i = this.pinkGooSplats.length - 1; i >= 0; i--) {
+      const splat = this.pinkGooSplats[i];
+      splat.life -= dt;
+      if (splat.life <= 0) {
+        this.pinkGooSplats.splice(i, 1);
+      }
+    }
+
+    // Update Splat Shockwave Bursts
+    for (let i = this.splatBursts.length - 1; i >= 0; i--) {
+      const sb = this.splatBursts[i];
+      sb.life -= dt;
+      const t = 1 - sb.life / sb.maxLife;
+      sb.currentR = sb.r + (sb.maxR - sb.r) * t;
+      if (sb.life <= 0) {
+        this.splatBursts.splice(i, 1);
+      }
+    }
+
     // Update Particles
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const pt = this.particles[i];
@@ -1069,7 +1302,8 @@ export class CoffeePlatformerEngine {
       biome: this.currentBiome,
       discoveredCount: this.discoveredProducts.size,
       totalProducts: PRODUCTS.length,
-      shieldActive: this.player.shieldActive
+      shieldActive: this.player.shieldActive,
+      hasBeanGun: this.player.hasBeanGun
     });
   }
 
@@ -1096,12 +1330,22 @@ export class CoffeePlatformerEngine {
       this.renderer.drawPlatform(plat, camX, this.time);
     }
 
-    // 4. Collectible Golden Coffee Beans
+    // 4. Persistent Pink Goo Splats on Platforms
+    this.renderer.drawPinkGooSplats(this.pinkGooSplats, camX);
+
+    // 5. Weapon Pickups (Bean Blaster Gun)
+    if (this.level.weaponPickups) {
+      for (const pickup of this.level.weaponPickups) {
+        this.renderer.drawWeaponPickup(pickup, camX, this.time);
+      }
+    }
+
+    // 6. Collectible Golden Coffee Beans
     for (const bean of this.level.beans) {
       this.renderer.drawBean(bean, camX, this.time);
     }
 
-    // 5. Mystery Product Pedestals
+    // 7. Mystery Product Pedestals
     for (const node of this.level.productNodes) {
       const product = PRODUCTS.find((pr) => pr.id === node.productId);
       if (product) {
@@ -1109,29 +1353,41 @@ export class CoffeePlatformerEngine {
       }
     }
 
-    // 6. Enemies
+    // 8. Live Enemies
     for (const enemy of this.level.enemies) {
       this.renderer.drawEnemy(enemy, camX, this.time);
     }
 
-    // 7. Espresso Shot Projectiles
-    for (const proj of this.projectiles) {
-      const sx = proj.x - camX;
-      ctx.save();
-      ctx.fillStyle = '#fbbf24';
-      ctx.strokeStyle = '#451a03';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(sx, proj.y, proj.r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
+    // 9. Dying Enemies (Swelling, shaking with pressure, and bursting into pink goo!)
+    for (const de of this.dyingEnemies) {
+      this.renderer.drawDyingEnemy(de, camX, this.time);
     }
 
-    // 8. Hero Coffee Cup Character
+    // 10. Projectiles (Spinning Coffee Beans or Espresso Shots)
+    for (const proj of this.projectiles) {
+      if (proj.isBeanProjectile) {
+        this.renderer.drawBeanProjectile(proj, camX, this.time);
+      } else {
+        const sx = proj.x - camX;
+        ctx.save();
+        ctx.fillStyle = '#fbbf24';
+        ctx.strokeStyle = '#451a03';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(sx, proj.y, proj.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    // 11. Hero Coffee Cup Character (equipped with Bean Blaster Gun)
     this.renderer.drawPlayer(this.player, camX, this.time, this.unlockedPowerups);
 
-    // 9. Particles (Steam, Crema Splashes, Sugar Sparks)
+    // 12. Pink Goo Particles & Splat Shockwaves
+    this.renderer.drawPinkGooParticles(this.pinkGooParticles, this.splatBursts, camX);
+
+    // 13. Regular Particles (Steam, Crema Splashes, Sugar Sparks)
     for (const pt of this.particles) {
       const sx = pt.x - camX;
       ctx.save();
@@ -1143,10 +1399,10 @@ export class CoffeePlatformerEngine {
       ctx.restore();
     }
 
-    // 10. Foreground Swirling Milk Rapids & Boiling Crema Waves
+    // 14. Foreground Swirling Milk Rapids & Boiling Crema Waves
     this.renderer.drawForegroundLiquidAndFrame(camX, this.time, this.level.liquidLevel);
 
-    // 11. Floating Combat & Score Popups
+    // 15. Floating Combat & Score Popups
     for (const ft of this.floatingTexts) {
       const sx = ft.x - camX;
       ctx.save();

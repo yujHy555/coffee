@@ -17,15 +17,21 @@ const vaultModal = document.getElementById('vault-modal');
 const victoryModal = document.getElementById('victory-modal');
 const vaultGrid = document.getElementById('vault-grid');
 
+const touchShotBtn = document.getElementById('touch-shot-btn');
+const hintShot = document.getElementById('hint-shot');
+
 const engine = new CoffeePlatformerEngine(canvas, {
   onHudUpdate: (state) => {
-    // Render Hearts
+    // Render Hearts & Weapon Badge
     let heartsHtml = '';
     for (let i = 0; i < state.maxHp; i++) {
       heartsHtml += `<span class="heart ${i < state.hp ? 'active' : ''}">❤</span>`;
     }
     if (state.shieldActive) {
       heartsHtml += `<span class="heart active" title="Nitro Foam Shield Active" style="color:#f472b6">🛡</span>`;
+    }
+    if (state.hasBeanGun) {
+      heartsHtml += `<span class="heart active" title="Espresso Bean Blaster Equipped" style="color:#fde047; text-shadow: 0 0 8px rgba(253, 224, 71, 0.8)">🔫</span>`;
     }
     hudHearts.innerHTML = heartsHtml;
 
@@ -34,6 +40,16 @@ const engine = new CoffeePlatformerEngine(canvas, {
     hudBeans.textContent = state.beans;
     hudScore.textContent = String(state.score).padStart(6, '0').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     hudProductsCount.textContent = `${state.discoveredCount} / ${state.totalProducts}`;
+
+    if (touchShotBtn && state.hasBeanGun) {
+      touchShotBtn.innerHTML = '🔫 Shoot Beans';
+      touchShotBtn.style.background = 'linear-gradient(135deg, #ec4899, #be185d)';
+      touchShotBtn.style.borderColor = '#fbcfe8';
+    }
+    if (hintShot && state.hasBeanGun) {
+      hintShot.innerHTML = '<kbd>X</kbd> / <kbd>Click</kbd> Shoot Beans 🔫';
+      hintShot.style.color = '#fde047';
+    }
   },
   onProductDiscovered: (product) => {
     showProductShowcaseModal(product);
