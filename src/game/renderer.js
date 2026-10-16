@@ -3262,7 +3262,8 @@ export class WorldRenderer {
         isShooting,
         player.gunShootTimer || 0,
         player.gunRecoilX || 0,
-        weaponType
+        weaponType,
+        time
       );
     }
     ctx.restore();
@@ -3385,7 +3386,8 @@ export class WorldRenderer {
     isShooting = false,
     gunShootTimer = 0,
     gunRecoilX = 0,
-    weaponType = 'glock_16mm'
+    weaponType = 'glock_16mm',
+    time = 0
   ) {
     const limbCol = '#522915';
     const outlineCol = '#3A1B0C';
@@ -4275,7 +4277,7 @@ export class WorldRenderer {
     ctx.strokeStyle = '#083344';
     ctx.lineWidth = 2.0;
     ctx.beginPath();
-    ctx.roundRect(-3, -8, 26, 11, [4, 6, 2, 2]);
+    ctx.roundRect(-3, -8, 26, 11, 4);
     ctx.fill();
     ctx.stroke();
 
