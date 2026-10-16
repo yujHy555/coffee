@@ -1745,22 +1745,30 @@ export class WorldRenderer {
 
     const outlineCol = '#432212';
 
+    const airBlend = player.airBlend !== undefined ? player.airBlend : (player.onGround ? 0 : 1);
+    const airTime = player.airTime || time;
+    const limbLagX = (player.limbLagX || 0) * airBlend;
+    const limbLagY = (player.limbLagY || 0) * airBlend;
+    // Vertical velocity dangle offset: positive when rising (arms/legs hang down), negative when falling fast (wind trails arms up)
+    const armDangleY = airBlend * Math.max(-7, Math.min(15, limbLagY * 1.55 - (player.vy || 0) * 0.011));
+    const armFlutter = airBlend * Math.sin(airTime * 12.5) * 0.34;
+
     const runSwing = player.onGround
       ? Math.sin(player.animTime * 16) * Math.min(1, Math.abs(player.vx) / 160)
-      : -0.58;
+      : Math.sin(airTime * 12.5) * 0.45;
 
     // Slight sassy hip shift over the standing leg when hands are on his waist in idle
     const hipShiftX = idleBlend * -1.4;
     const hipBobY = idleBlend * Math.abs(Math.sin(time * 9.5)) * 0.9;
 
-    // --- 1. Far/Left Arm (In IDLE: Hand resting on left waist/hip! When moving: waves or swings!) ---
+    // --- 1. Far/Left Arm (In IDLE: Hand on waist! In AIR: Dangles & trails with velocity! On GROUND: Waves/swings!) ---
     ctx.save();
     if (idleBlend > 0.5 && !isAction) {
       // Left arm bent akimbo with hand planted firmly on the left waist/hip of the cup!
       this.drawWaistArm(ctx, -1, tapLift, hipShiftX, hipBobY);
     } else {
-      const waveX = (1 - sideMix) * -23 + sideMix * 19;
-      const waveY = (1 - sideMix) * 1 + sideMix * 3 + (player.scaleY - 1) * -4;
+      const waveX = (1 - sideMix) * -23 + sideMix * (18 - airBlend * 4) + limbLagX * 0.55;
+      const waveY = (1 - sideMix) * 1 + sideMix * 3 + (player.scaleY - 1) * -4 + armDangleY * 0.35;
       ctx.translate(waveX, waveY);
       this.drawProtagonistArm(
         ctx,
@@ -1769,33 +1777,52 @@ export class WorldRenderer {
         false,
         0,
         false,
-        runSwing * 0.42 + Math.sin(time * 6.5) * 0.09
+        runSwing * 0.42 * (1 - airBlend) + armFlutter + Math.sin(time * 6.5) * 0.09,
+        airBlend,
+        armDangleY,
+        limbLagX
       );
     }
     ctx.restore();
 
-    // --- 2. Legs & Cuffed Red Boots (With Impatient Foot-Tapping in Idle!) ---
-    const stride = runSwing * 11 * (1 - idleBlend);
-    const leftLegX = -8.5 + sideMix * 5 + stride;
-    const rightLegX = 8.5 + idleBlend * 1.8 - sideMix * 3 - stride;
+    // --- 2. Legs & Cuffed Red Boots (Dangle loosely in the air, stride when running, or tap foot in idle!) ---
+    const groundStride = runSwing * 11 * (1 - idleBlend) * (1 - airBlend);
+    const airKick = Math.sin(airTime * 13.5) * 4.6 * airBlend;
+    const leftLegX = -8.5 + sideMix * 4.5 + groundStride + limbLagX * 0.85 - airKick;
+    const rightLegX = 8.5 + idleBlend * 1.8 - sideMix * 2.5 - groundStride + limbLagX * 0.7 + airKick;
 
-    // Left / Standing Boot (Planted solidly during idle foot-tapping)
+    // When airborne, legs extend & hang downward below the cup instead of tucking up!
+    const leftAirDrop = airBlend * (4.8 + Math.max(-1.5, limbLagY * 0.65) + Math.cos(airTime * 13.5) * 2.2);
+    const rightAirDrop = airBlend * (5.8 + Math.max(-1.5, limbLagY * 0.65) - Math.cos(airTime * 13.5) * 2.2);
+    const leftGroundLift = Math.max(0, -runSwing) * 4.5 * (1 - idleBlend) * (1 - airBlend);
+    const rightGroundLift = Math.max(0, runSwing) * 4.5 * (1 - idleBlend) * (1 - airBlend);
+
+    // Dangling boot angle: toes point loosely downward and swing like a pendulum in the air!
+    const airToeDangle = airBlend * (0.38 + Math.max(-0.22, Math.min(0.32, -(player.vy || 0) * 0.0005)));
+    const leftBootAngle = -runSwing * 0.42 * (1 - idleBlend) * (1 - airBlend) + airToeDangle - airFlutter * 0.65;
+    const rightBootAngle = runSwing * 0.42 * (1 - idleBlend) * (1 - airBlend) + airToeDangle + airFlutter * 0.65;
+
+    // Left / Standing or Back Dangling Boot
     this.drawCupBoot(
       leftLegX,
-      20.2 - Math.max(0, -runSwing) * 4.5 * (1 - idleBlend),
-      -runSwing * 0.42 * (1 - idleBlend),
+      20.2 - leftGroundLift + leftAirDrop,
+      leftBootAngle,
       0.25 + sideMix * 0.65,
-      0
+      0,
+      leftAirDrop,
+      -limbLagX * 0.45
     );
 
-    // Right / Tapping Boot (Pivots on heel & taps toe impatiently when waiting in idle!)
-    const tapToeAngle = idleBlend * (-tapLift * 0.44);
+    // Right / Tapping or Front Dangling Boot
+    const tapToeAngle = idleBlend * (1 - airBlend) * (-tapLift * 0.44);
     this.drawCupBoot(
       rightLegX,
-      20.8 - Math.max(0, runSwing) * 4.5 * (1 - idleBlend),
-      runSwing * 0.42 * (1 - idleBlend),
+      20.8 - rightGroundLift + rightAirDrop,
+      rightBootAngle,
       0.38 + sideMix * 0.62 + idleBlend * 0.25,
-      tapToeAngle
+      tapToeAngle,
+      rightAirDrop,
+      -limbLagX * 0.45
     );
 
     // Subtle rhythmic tap lines near the tapping boot toe when it strikes the ground in idle!
@@ -2177,15 +2204,15 @@ export class WorldRenderer {
     ctx.restore(); // end cup body + face group
     ctx.restore(); // end hipShift group
 
-    // --- 8. Near/Right Arm (In IDLE: Hand resting on right waist/hip! When moving/attacking: swings or slashes!) ---
+    // --- 8. Near/Right Arm (In IDLE: Hand on waist! In AIR: Dangles loosely! When moving/attacking: swings or slashes!) ---
     ctx.save();
     const spoonUpgraded = unlockedPowerups.has('silver_spoon');
     if (idleBlend > 0.5 && !isAction && player.meleeTimer <= 0) {
       // Right arm bent akimbo with hand planted firmly on the right waist/hip of the cup!
       this.drawWaistArm(ctx, 1, tapLift, hipShiftX, hipBobY);
     } else {
-      const nearArmX = (1 - sideMix) * 21 + sideMix * 2;
-      const nearArmY = (1 - sideMix) * 4 + sideMix * 8 + (player.scaleY - 1) * -3;
+      const nearArmX = (1 - sideMix) * 21 + sideMix * (2 + limbLagX * 0.45);
+      const nearArmY = (1 - sideMix) * 4 + sideMix * 8 + (player.scaleY - 1) * -3 + armDangleY * 0.28;
 
       ctx.translate(nearArmX, nearArmY);
       this.drawProtagonistArm(
@@ -2195,7 +2222,10 @@ export class WorldRenderer {
         player.meleeTimer > 0,
         player.meleeTimer,
         spoonUpgraded,
-        -runSwing * 0.42
+        -runSwing * 0.42 * (1 - airBlend) - armFlutter * 1.15,
+        airBlend,
+        armDangleY,
+        limbLagX
       );
     }
     ctx.restore();
@@ -2248,7 +2278,18 @@ export class WorldRenderer {
     ctx.restore();
   }
 
-  drawProtagonistArm(ctx, dir, isWaving, isSlashing, meleeTimer, spoonUpgraded = false, walkSwing = 0) {
+  drawProtagonistArm(
+    ctx,
+    dir,
+    isWaving,
+    isSlashing,
+    meleeTimer,
+    spoonUpgraded = false,
+    walkSwing = 0,
+    airBlend = 0,
+    armDangleY = 0,
+    limbLagX = 0
+  ) {
     const limbCol = '#522915';
     const outlineCol = '#3A1B0C';
 
@@ -2288,37 +2329,45 @@ export class WorldRenderer {
       ctx.arc(0, 0, spoonUpgraded ? 48 : 35, -1.25, 1.15);
       ctx.stroke();
     } else if (isWaving) {
-      // Exact Raised Waving / Reaching 4-Finger Hand with refined thinner linework!
-      ctx.rotate(walkSwing * 0.38);
+      // Raised Waving / Reaching 4-Finger Hand that dangles & trails loosely in mid-air!
+      ctx.rotate(walkSwing * 0.45);
+
+      const ctrlX = dir * 9 + limbLagX * 0.45;
+      const ctrlY = -2 + armDangleY * 0.85;
+      const endX = dir * (13 - airBlend * 2.5) + limbLagX * 0.8;
+      const endY = -11 + armDangleY * 1.35 + airBlend * 5.5;
 
       ctx.strokeStyle = outlineCol;
       ctx.lineWidth = 3.5;
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.quadraticCurveTo(dir * 9, -2, dir * 13, -11);
+      ctx.quadraticCurveTo(ctrlX, ctrlY, endX, endY);
       ctx.stroke();
 
       ctx.strokeStyle = limbCol;
       ctx.lineWidth = 2.3;
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.quadraticCurveTo(dir * 9, -2, dir * 13, -11);
+      ctx.quadraticCurveTo(ctrlX, ctrlY, endX, endY);
       ctx.stroke();
 
-      // Cute spread 4-fingered hand
+      // Cute spread 4-fingered hand dangling at the wrist
+      const handX = endX + dir * 0.8;
+      const handY = endY - 0.8 + airBlend * 1.2;
       ctx.fillStyle = limbCol;
       ctx.strokeStyle = outlineCol;
       ctx.lineWidth = 1.1;
       ctx.beginPath();
-      ctx.arc(dir * 14, -12, 3.4, 0, Math.PI * 2);
+      ctx.arc(handX, handY, 3.4, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
-      const fingerAngles = [-0.6, -0.15, 0.3];
+      const wristDroop = airBlend * 0.35 + armDangleY * 0.03;
+      const fingerAngles = [-0.6 + wristDroop, -0.15 + wristDroop, 0.3 + wristDroop];
       fingerAngles.forEach((fa) => {
         ctx.save();
-        ctx.translate(dir * 14, -12);
+        ctx.translate(handX, handY);
         ctx.rotate(fa * dir);
         ctx.beginPath();
         ctx.roundRect(dir > 0 ? 1 : -5.2, -2.3, 4.2, 2.0, 1);
@@ -2327,61 +2376,72 @@ export class WorldRenderer {
         ctx.restore();
       });
     } else {
-      // Exact Curved Lower Arm with refined thinner linework
+      // Near Lower Arm that dangles downward & trails loosely in the air!
       ctx.rotate(walkSwing);
+
+      const ctrlX = dir * (3 - airBlend * 2) + limbLagX * 0.6;
+      const ctrlY = 7 + airBlend * 4.5 + armDangleY * 0.7;
+      const endX = dir * (10 - airBlend * 4.5) + limbLagX * 0.95;
+      const endY = 4 + airBlend * 7.5 + armDangleY * 1.1;
 
       ctx.strokeStyle = outlineCol;
       ctx.lineWidth = 3.5;
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.quadraticCurveTo(dir * 3, 7, dir * 10, 4);
+      ctx.quadraticCurveTo(ctrlX, ctrlY, endX, endY);
       ctx.stroke();
 
       ctx.strokeStyle = limbCol;
       ctx.lineWidth = 2.3;
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.quadraticCurveTo(dir * 3, 7, dir * 10, 4);
+      ctx.quadraticCurveTo(ctrlX, ctrlY, endX, endY);
       ctx.stroke();
 
       ctx.fillStyle = limbCol;
       ctx.strokeStyle = outlineCol;
       ctx.lineWidth = 1.1;
       ctx.beginPath();
-      ctx.arc(dir * 11, 3.8, 3.0, 0, Math.PI * 2);
+      ctx.arc(endX + dir * 0.8, endY + 0.4, 3.0, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     }
     ctx.restore();
   }
 
-  drawCupBoot(x, y, angle, toeProfile = 0.5, toeTapAngle = 0) {
+  drawCupBoot(x, y, angle, toeProfile = 0.5, toeTapAngle = 0, legDangleY = 0, legBendX = 0) {
     const ctx = this.ctx;
     ctx.save();
     ctx.translate(x, y);
-    ctx.rotate(angle);
 
     const outlineCol = '#432212';
     const limbCol = '#522915';
     const bootRed = '#C63B33';
     const bootShadow = '#9E2A24';
 
-    // Dark brown stick leg (thinner, refined linework)
+    // Dark brown stick leg (extends higher & bends loosely when dangling in the air!)
+    const topLegY = -8 - legDangleY * 1.15;
+    const topLegX = -legBendX * 0.6;
     ctx.strokeStyle = outlineCol;
     ctx.lineWidth = 3.5;
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(0, -8);
-    ctx.lineTo(0, 2);
+    ctx.moveTo(topLegX, topLegY);
+    ctx.quadraticCurveTo(legBendX, (topLegY + 2) * 0.45, 0, 2);
     ctx.stroke();
 
     ctx.strokeStyle = limbCol;
     ctx.lineWidth = 2.3;
     ctx.beginPath();
-    ctx.moveTo(0, -8);
-    ctx.lineTo(0, 2);
+    ctx.moveTo(topLegX, topLegY);
+    ctx.quadraticCurveTo(legBendX, (topLegY + 2) * 0.45, 0, 2);
     ctx.stroke();
+
+    // Rotate the boot itself at the ankle (0, 2) so it dangles and swings freely in the air!
+    ctx.translate(0, 2);
+    ctx.rotate(angle);
+    ctx.translate(0, -2);
 
     // Pivot around the back heel (-4.5, 7.5) when tapping the foot in idle!
     if (Math.abs(toeTapAngle) > 0.001) {

@@ -119,6 +119,12 @@ export class CoffeePlatformerEngine {
       animTime: 0,
       idleTimer: 0,
       idleBlend: 0,
+      airBlend: 0,
+      airTime: 0,
+      limbLagX: 0,
+      limbLagY: 0,
+      limbVelX: 0,
+      limbVelY: 0,
       blinkTimer: 0,
       nextBlink: 2.6,
       eyeLookX: 0,
@@ -280,19 +286,22 @@ export class CoffeePlatformerEngine {
       p.coyoteTimer = 0;
       p.jumpBufferTimer = 0;
       p.jumpsRemaining = maxJumps - 1;
+      p.limbVelY = 34; // Downward limb-dangle impulse on launch
       // Snappy vertical stretch on takeoff!
       this.impulseScale(0.68, 1.38, 3.2);
       sound.playJump(false);
       this.spawnCoffeeSplash(p.x, p.y - 18, 9, '#78350f');
       this.spawnCoffeeSplash(p.x, p.y + 22, 6, '#fde68a');
     } else if (p.jumpsRemaining > 0) {
-      p.vy = -545;
+      // Stronger 2nd jump (double-jump) with powerful upward thrust!
+      p.vy = -655;
       p.jumpsRemaining--;
       p.jumpBufferTimer = 0;
+      p.limbVelY = 44; // Extra dramatic downward dangle kick on double-jump!
       // Double-jump mid-air pop & stretch!
-      this.impulseScale(0.72, 1.34, 3.6);
+      this.impulseScale(0.64, 1.44, 4.4);
       sound.playJump(true);
-      this.spawnCoffeeSplash(p.x, p.y + 16, 14, '#fef08a');
+      this.spawnCoffeeSplash(p.x, p.y + 16, 16, '#fef08a');
     }
   }
 
@@ -686,6 +695,28 @@ export class CoffeePlatformerEngine {
     // Smoothly blend into the impatient hands-on-waist & foot-tapping pose when waiting
     const targetIdleBlend = p.idleTimer > 0.18 ? 1 : 0;
     p.idleBlend += (targetIdleBlend - p.idleBlend) * Math.min(1, (targetIdleBlend ? 8.5 : 16) * dt);
+
+    // Mid-air Dangle Physics for Arms & Legs (Pendulum trail & velocity drag!)
+    const targetAirBlend = p.onGround ? 0 : 1;
+    p.airBlend += (targetAirBlend - p.airBlend) * Math.min(1, (p.onGround ? 22 : 14) * dt);
+    if (!p.onGround) {
+      p.airTime += dt;
+    } else {
+      p.airTime = 0;
+    }
+
+    // Limbs trail behind horizontal movement (-vx) and react to vertical velocity (vy)
+    const targetLimbX = !p.onGround
+      ? Math.max(-8.5, Math.min(8.5, (-p.vx * p.facing) * 0.022)) + Math.sin(p.airTime * 11.5) * 2.2
+      : 0;
+    const targetLimbY = !p.onGround
+      ? Math.max(-4.5, Math.min(8.5, 4.2 - p.vy * 0.0085)) + Math.cos(p.airTime * 11.5) * 1.4
+      : 0;
+
+    p.limbVelX += ((targetLimbX - p.limbLagX) * 145 - p.limbVelX * 11) * dt;
+    p.limbVelY += ((targetLimbY - p.limbLagY) * 145 - p.limbVelY * 11) * dt;
+    p.limbLagX = Math.max(-10, Math.min(10, p.limbLagX + p.limbVelX * dt));
+    p.limbLagY = Math.max(-6, Math.min(10, p.limbLagY + p.limbVelY * dt));
 
     // Natural eye blinking cycle (occasional double blink!)
     p.nextBlink -= dt;
