@@ -356,22 +356,18 @@ export class CoffeePlatformerEngine {
       p.vx -= p.facing * 75; // Snappy gunslinger recoil
       sound.playEspressoShot();
 
-      const isTriple = this.unlockedPowerups.has('triple_shot');
-      const spreads = isTriple ? [-85, 0, 85] : [0];
-
-      spreads.forEach((vySpread) => {
-        this.projectiles.push({
-          x: p.x + p.facing * 40,
-          y: p.y - 2,
-          vx: p.facing * 840,
-          vy: vySpread + (Math.random() - 0.5) * 35,
-          r: 9,
-          life: 1.5,
-          isBeanProjectile: true,
-          rot: Math.random() * Math.PI * 2,
-          rotSpeed: p.facing * (18 + Math.random() * 8),
-          pierce: isTriple ? 2 : 1
-        });
+      // Shoot exactly one high-velocity bullet straight ahead!
+      this.projectiles.push({
+        x: p.x + p.facing * 40,
+        y: p.y - 2,
+        vx: p.facing * 860,
+        vy: 0,
+        r: 9,
+        life: 1.5,
+        isBeanProjectile: true,
+        rot: Math.random() * Math.PI * 2,
+        rotSpeed: p.facing * 20,
+        pierce: 1
       });
 
       // Muzzle flash sparks & smoke at the barrel tip

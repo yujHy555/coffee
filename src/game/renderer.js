@@ -2919,11 +2919,6 @@ export class WorldRenderer {
     ctx.lineTo(3.5, -2);
     ctx.stroke();
 
-    // Laser-engraved Crisp Slide Marking: "GLOCK 16mm"
-    ctx.fillStyle = '#cbd5e1';
-    ctx.font = 'bold 3.8px system-ui, sans-serif';
-    ctx.fillText('GLOCK 16mm', 5.5, -3.2);
-
     // White 3-Dot Combat Sights
     // Rear Sight Notch with 2 white dots
     ctx.fillStyle = '#0f1115';
