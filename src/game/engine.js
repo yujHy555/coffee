@@ -25,6 +25,27 @@ export class CoffeePlatformerEngine {
 
     this.resetLevel();
     this.bindInput();
+    this.handleResize();
+    window.addEventListener('resize', () => this.handleResize());
+    window.addEventListener('orientationchange', () => {
+      setTimeout(() => this.handleResize(), 120);
+    });
+  }
+
+  handleResize() {
+    const rect = this.canvas.parentElement?.getBoundingClientRect();
+    if (!rect || rect.width === 0 || rect.height === 0) return;
+
+    const aspect = rect.width / rect.height;
+    // Keep vertical world height locked at 640 logical units so platform physics and jumps
+    // stay 100% consistent, while dynamically adapting horizontal field-of-view for Portrait,
+    // Standard 16:9, or Ultrawide screens!
+    this.height = 640;
+    this.width = Math.round(Math.max(460, Math.min(1850, 640 * aspect)));
+
+    this.canvas.width = this.width;
+    this.canvas.height = this.height;
+    this.renderer.resize(this.width, this.height);
   }
 
   resetLevel() {
@@ -567,10 +588,13 @@ export class CoffeePlatformerEngine {
       if (ft.life <= 0) this.floatingTexts.splice(i, 1);
     }
 
-    // Smooth Camera Follow with look-ahead
+    // Smooth Camera Follow with adaptive look-ahead for Portrait vs Landscape
+    const isPortrait = this.width < 700;
+    const anchorRatio = isPortrait ? 0.44 : 0.36;
+    const lookAhead = isPortrait ? 28 : 65;
     const targetCamX = Math.max(
       0,
-      Math.min(this.level.width - this.width, p.x - this.width * 0.36 + p.facing * 65)
+      Math.min(this.level.width - this.width, p.x - this.width * anchorRatio + p.facing * lookAhead)
     );
     this.cameraX += (targetCamX - this.cameraX) * 6.5 * dt;
 

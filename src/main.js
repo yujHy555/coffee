@@ -181,6 +181,41 @@ document.getElementById('restart-btn').addEventListener('click', () => {
   engine.resetLevel();
 });
 
+// Fullscreen Toggle Button & 'F' Keyboard Shortcut
+const fullscreenBtn = document.getElementById('fullscreen-btn');
+const gameCabinet = document.querySelector('.game-cabinet');
+
+function toggleFullscreen() {
+  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+    const req =
+      gameCabinet.requestFullscreen ||
+      gameCabinet.webkitRequestFullscreen ||
+      document.documentElement.requestFullscreen;
+    if (req) {
+      req.call(gameCabinet).catch(() => {});
+    }
+  } else {
+    const exit = document.exitFullscreen || document.webkitExitFullscreen;
+    if (exit) {
+      exit.call(document).catch(() => {});
+    }
+  }
+}
+
+fullscreenBtn.addEventListener('click', toggleFullscreen);
+
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'KeyF' && !engine.paused) {
+    toggleFullscreen();
+  }
+});
+
+document.addEventListener('fullscreenchange', () => {
+  const isFs = Boolean(document.fullscreenElement);
+  fullscreenBtn.textContent = isFs ? '🗗' : '⛶';
+  setTimeout(() => engine.handleResize(), 60);
+});
+
 // Touch Controls Binding
 document.querySelectorAll('.touch-btn[data-key]').forEach((btn) => {
   const key = btn.getAttribute('data-key');
