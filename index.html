@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Cuppa Quest: The Magical Roastery — AAA Coffee Action Platformer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- Ornate Roasted-Bean & Latte-Art Cabinet Frame -->
+      <div class="game-cabinet">
+        <div class="cabinet-viewport">
+          <canvas id="game-canvas" width="1280" height="640"></canvas>
+
+          <!-- AAA HUD OVERLAY (Inspired directly by Reference Image 1 & 2) -->
+          <div class="hud-layer">
+            <!-- Top-Left: Animated Cup Portrait, Hearts & Golden Caffeine Bar -->
+            <div class="hud-left">
+              <div class="portrait-medallion" title="Hero Cup Status">
+                <div class="portrait-steam">
+                  <span></span><span></span>
+                </div>
+                <div class="portrait-cup">
+                  <div class="portrait-coffee-top"></div>
+                  <div class="portrait-face">
+                    <i class="eye left"></i>
+                    <i class="mouth"></i>
+                    <i class="eye right"></i>
+                  </div>
+                </div>
+              </div>
+
+              <div class="vitals-stack">
+                <div class="hearts-pill" id="hud-hearts">
+                  <span class="heart active">❤</span>
+                  <span class="heart active">❤</span>
+                  <span class="heart active">❤</span>
+                </div>
+                <div class="caffeine-bar-frame">
+                  <div class="caffeine-bar-fill" id="hud-caffeine" style="width: 65%"></div>
+                  <span class="caffeine-label">CREMA ENERGY</span>
+                </div>
+                <div class="biome-pill" id="hud-biome">★ Starry Espresso Hills</div>
+              </div>
+            </div>
+
+            <!-- Top-Center: Quick Action Bar -->
+            <div class="hud-center">
+              <button class="vault-trigger-btn" id="open-vault-btn">
+                <span class="vault-badge-icon">☕</span>
+                <span>Product Vault</span>
+                <strong id="hud-products-count">0 / 4</strong>
+              </button>
+              <button class="icon-hud-btn" id="mute-btn" title="Toggle Audio">🔊</button>
+              <button class="icon-hud-btn" id="restart-btn" title="Restart Level">↺</button>
+            </div>
+
+            <!-- Top-Right: Bean Counter, Score & Timer -->
+            <div class="hud-right">
+              <div class="bean-counter-row">
+                <span class="golden-bean-icon"></span>
+                <span class="bean-multiplier">×</span>
+                <span class="bean-value" id="hud-beans">0</span>
+              </div>
+              <div class="score-row">
+                <span class="score-label">SCORE:</span>
+                <span class="score-value" id="hud-score">000,000</span>
+              </div>
+              <div class="timer-row">
+                <span class="timer-clock">🕒</span>
+                <span class="timer-value" id="hud-timer">00:00</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Controls Hint Bar / Touch Controls -->
+          <div class="controls-bar">
+            <div class="desktop-controls-hint">
+              <span><kbd>A</kbd><kbd>D</kbd> or <kbd>◀</kbd><kbd>▶</kbd> Move</span>
+              <span><kbd>Space</kbd> / <kbd>W</kbd> Double Jump</span>
+              <span><kbd>Z</kbd> / <kbd>J</kbd> Silver Spoon Slash</span>
+              <span><kbd>X</kbd> / <kbd>K</kbd> Espresso Shot</span>
+              <span><kbd>Shift</kbd> Frothy Dash</span>
+            </div>
+            <div class="touch-controls">
+              <div class="touch-dpad">
+                <button class="touch-btn" data-key="ArrowLeft">◀</button>
+                <button class="touch-btn" data-key="ArrowRight">▶</button>
+              </div>
+              <div class="touch-actions">
+                <button class="touch-btn action-spoon" data-tap="KeyZ">🥄 Slash</button>
+                <button class="touch-btn action-shot" data-tap="KeyX">☕ Shot</button>
+                <button class="touch-btn action-jump" data-tap="Space">⬆ Jump</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- PRODUCT DISCOVERY SHOWCASE MODAL (Triggered on collecting a new product) -->
+          <div class="modal-backdrop hidden" id="product-modal">
+            <div class="product-showcase-card">
+              <div class="showcase-header-badge" id="modal-product-badge">NEW PRODUCT DISCOVERED!</div>
+              <div class="showcase-grid">
+                <div class="showcase-visual" id="modal-product-visual">
+                  <div class="product-3d-pack" id="modal-pack-color">
+                    <div class="pack-shine"></div>
+                    <div class="pack-crest">☕</div>
+                    <div class="pack-label" id="modal-pack-category">SIGNATURE ROAST</div>
+                  </div>
+                </div>
+                <div class="showcase-details">
+                  <span class="product-origin-pill" id="modal-product-origin">Antigua Guatemala</span>
+                  <h2 id="modal-product-name">Midnight Velvet Espresso Roast</h2>
+                  <p class="product-tagline" id="modal-product-tagline">Dark Chocolate • Toasted Hazelnut • Star-Kissed Crema</p>
+                  <p class="product-desc" id="modal-product-desc"></p>
+
+                  <div class="tasting-notes-row" id="modal-tasting-notes"></div>
+
+                  <div class="powerup-unlock-banner">
+                    <div class="powerup-icon">⚡</div>
+                    <div>
+                      <div class="powerup-Unlocked-label">IN-GAME POWER-UP UNLOCKED</div>
+                      <strong id="modal-powerup-title">Triple-Shot Crema Blaster</strong>
+                      <p id="modal-powerup-desc"></p>
+                    </div>
+                  </div>
+
+                  <div class="showcase-footer">
+                    <div class="price-box">
+                      <span class="price-val" id="modal-product-price">$22.00</span>
+                      <span class="weight-val" id="modal-product-weight">12 oz (340g)</span>
+                    </div>
+                    <div class="showcase-actions">
+                      <a href="#shop" class="btn-secondary" id="modal-shop-link">Reserve Bag in Shop</a>
+                      <button class="btn-primary" id="modal-continue-btn">Equip Power-Up & Continue ▶</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- BARISTA PRODUCT VAULT / CATALOG MODAL -->
+          <div class="modal-backdrop hidden" id="vault-modal">
+            <div class="vault-dialog">
+              <div class="vault-header">
+                <div>
+                  <span class="vault-eyebrow">BARISTA COMPENDIUM & SHOP</span>
+                  <h2>Discovered Roastery Products & Power-Ups</h2>
+                </div>
+                <button class="close-modal-btn" id="close-vault-btn">✕</button>
+              </div>
+              <p class="vault-subtitle">
+                Explore the magical coffee world to discover all 4 signature products, or click <strong>Instant Test Unlock</strong> on any card below to preview its product details and in-game power-up right away!
+              </p>
+              <div class="vault-grid" id="vault-grid"></div>
+            </div>
+          </div>
+
+          <!-- VICTORY ROASTERY MODAL -->
+          <div class="modal-backdrop hidden" id="victory-modal">
+            <div class="victory-dialog">
+              <div class="victory-badge">🏆 GRAND BARISTA CHAMPION 🏆</div>
+              <h2>You Reached the Golden Roastery Sanctuary!</h2>
+              <p>Your cup brims with legendary crema across the Starry Espresso Hills and Sunset Biscotti Grove.</p>
+              <div class="victory-stats" id="victory-stats"></div>
+              <div class="victory-actions">
+                <button class="btn-secondary" id="victory-vault-btn">Inspect Product Vault</button>
+                <button class="btn-primary" id="victory-replay-btn">Play Again ↺</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
