@@ -65,14 +65,38 @@ export class CoffeePlatformerEngine {
       node.collected = this.discoveredProducts.has(node.productId);
     });
 
+    // Initialize dynamic physics & spring state on every enemy
+    this.level.enemies.forEach((enemy, idx) => {
+      enemy.groundY = enemy.y;
+      enemy.vy = 0;
+      enemy.onGround = enemy.type !== 'steam_spirit';
+      enemy.scaleX = 1;
+      enemy.scaleY = 1;
+      enemy.scaleVx = 0;
+      enemy.scaleVy = 0;
+      enemy.tiltAngle = 0;
+      enemy.groundAngle = 0;
+      enemy.animPhase = idx * 1.3;
+      enemy.hopCount = 0;
+      enemy.hopPauseTimer = 0;
+      enemy.aggro = false;
+      enemy.aggroCooldown = 0;
+      enemy.hitFlashTimer = 0;
+      enemy.knockbackVx = 0;
+      enemy.baseSpeed = Math.abs(enemy.vx) || 85;
+    });
+
     this.player = {
       x: 130,
       y: 420,
       vx: 0,
       vy: 0,
-      r: 25, // Slightly larger protagonist presence
+      r: 29, // Even larger heroic Coffee Cup presence (matches 1.38x visual scale)
       facing: 1,
       onGround: false,
+      groundPlat: null,
+      groundAngle: 0,
+      targetGroundAngle: 0,
       jumpsRemaining: 2,
       coyoteTimer: 0,
       jumpBufferTimer: 0,
@@ -93,6 +117,12 @@ export class CoffeePlatformerEngine {
       sloshAngle: 0,
       sloshVel: 0,
       animTime: 0,
+      idleTimer: 0,
+      idleBlend: 0,
+      blinkTimer: 0,
+      nextBlink: 2.6,
+      eyeLookX: 0,
+      eyeLookY: 0,
       shieldActive: this.unlockedPowerups.has('nitro_shield'),
       checkpointX: 130,
       checkpointY: 420
@@ -174,13 +204,79 @@ export class CoffeePlatformerEngine {
     p.sloshVel += (targetScaleY - targetScaleX) * 14 * p.facing;
   }
 
+  impulseEnemyScale(enemy, targetScaleX, targetScaleY, impulseVy = 0) {
+    enemy.scaleX = targetScaleX;
+    enemy.scaleY = targetScaleY;
+    enemy.scaleVx = (1 - targetScaleX) * 5.2;
+    enemy.scaleVy = (1 - targetScaleY) * 5.2 + impulseVy;
+  }
+
+  // Computes the exact curved/rounded top surface Y of any platform at worldX
+  // Matches the visual silhouette of rounded biscuits, domed mossy coffee beans,
+  // arched biscotti slices, chocolate cookies, gingerbread cliffs, and bobbing sugar cubes!
+  getPlatformSurfaceY(plat, worldX, time = this.time) {
+    const localX = Math.max(0, Math.min(plat.w, worldX - plat.x));
+    const u = (localX - plat.w * 0.5) / (plat.w * 0.5); // -1 at left edge, 0 at center, +1 at right edge
+
+    if (plat.type === 'mossy_bean') {
+      // Elliptical mossy boulder dome: highest in the center, smoothly curving down rounded sides
+      const clampedU = Math.max(-0.96, Math.min(0.96, u));
+      const domeDrop = (1 - Math.sqrt(1 - clampedU * clampedU)) * (plat.h * 0.34);
+      return plat.y - 2 + domeDrop;
+    }
+
+    if (plat.type === 'biscotti') {
+      // Arched almond biscotti slice: gently crowned center curving down toward both rounded ends
+      const archDrop = (u * u) * (plat.h * 0.32);
+      return plat.y + 1 + archDrop;
+    }
+
+    if (plat.type === 'sugar_cube') {
+      // Floating crystalline sugar cube with vertical bob, slight tilt, and beveled edges
+      const bob = Math.sin(time * 3.2 + plat.x * 0.025) * 4;
+      const tilt = ((plat.x % 200) - 100) * 0.0012;
+      const tiltOffset = (localX - plat.w * 0.5) * Math.sin(tilt);
+      const edgeRadius = 11;
+      let edgeDrop = 0;
+      if (localX < edgeRadius) {
+        const t = Math.min(0.95, (edgeRadius - localX) / edgeRadius);
+        edgeDrop = (1 - Math.sqrt(1 - t * t)) * 6;
+      } else if (localX > plat.w - edgeRadius) {
+        const t = Math.min(0.95, (localX - (plat.w - edgeRadius)) / edgeRadius);
+        edgeDrop = (1 - Math.sqrt(1 - t * t)) * 6;
+      }
+      return plat.y + bob + tiltOffset + edgeDrop;
+    }
+
+    // Biscuit, Chocolate Cookie, and Gingerbread platforms: flat top with smooth rounded corners at edges
+    const edgeRadius = Math.min(28, plat.w * 0.25);
+    let edgeDrop = 0;
+    if (localX < edgeRadius) {
+      const t = Math.min(0.95, (edgeRadius - localX) / edgeRadius);
+      edgeDrop = (1 - Math.sqrt(1 - t * t)) * 13;
+    } else if (localX > plat.w - edgeRadius) {
+      const t = Math.min(0.95, (localX - (plat.w - edgeRadius)) / edgeRadius);
+      edgeDrop = (1 - Math.sqrt(1 - t * t)) * 13;
+    }
+    return plat.y + edgeDrop;
+  }
+
+  getPlatformSlopeAngle(plat, worldX, time = this.time) {
+    const step = 4;
+    const yLeft = this.getPlatformSurfaceY(plat, worldX - step, time);
+    const yRight = this.getPlatformSurfaceY(plat, worldX + step, time);
+    return Math.max(-0.48, Math.min(0.48, Math.atan2(yRight - yLeft, step * 2)));
+  }
+
   triggerJump() {
     const p = this.player;
     const maxJumps = this.unlockedPowerups.has('golden_boost') ? 3 : 2;
 
     if (p.onGround || p.coyoteTimer > 0) {
-      p.vy = -595;
+      p.vy = -605;
       p.onGround = false;
+      p.groundPlat = null;
+      p.targetGroundAngle = 0;
       p.coyoteTimer = 0;
       p.jumpBufferTimer = 0;
       p.jumpsRemaining = maxJumps - 1;
@@ -190,7 +286,7 @@ export class CoffeePlatformerEngine {
       this.spawnCoffeeSplash(p.x, p.y - 18, 9, '#78350f');
       this.spawnCoffeeSplash(p.x, p.y + 22, 6, '#fde68a');
     } else if (p.jumpsRemaining > 0) {
-      p.vy = -535;
+      p.vy = -545;
       p.jumpsRemaining--;
       p.jumpBufferTimer = 0;
       // Double-jump mid-air pop & stretch!
@@ -213,7 +309,7 @@ export class CoffeePlatformerEngine {
     sound.playSpoonSwing(upgraded);
 
     // Check melee hitbox in front of player
-    const reach = upgraded ? 84 : 60;
+    const reach = upgraded ? 88 : 64;
     const hitX = p.x + p.facing * (reach * 0.6);
     const hitY = p.y;
 
@@ -239,7 +335,7 @@ export class CoffeePlatformerEngine {
 
     spreads.forEach((vySpread) => {
       this.projectiles.push({
-        x: p.x + p.facing * 28,
+        x: p.x + p.facing * 32,
         y: p.y - 4,
         vx: p.facing * 660,
         vy: vySpread,
@@ -312,6 +408,8 @@ export class CoffeePlatformerEngine {
 
   damageEnemy(enemy, dmg, knockbackVx = 0) {
     enemy.hp -= dmg;
+    enemy.hitFlashTimer = 0.2;
+    this.impulseEnemyScale(enemy, 1.42, 0.64, 3.8);
     this.spawnCoffeeSplash(enemy.x, enemy.y, 12, '#f59e0b');
     this.shakeTimer = 0.12;
     this.shakeIntensity = 5;
@@ -325,7 +423,11 @@ export class CoffeePlatformerEngine {
       this.spawnCoffeeSplash(enemy.x, enemy.y, 20, '#fef08a');
       this.syncHud();
     } else {
-      enemy.x += knockbackVx * 0.08;
+      enemy.knockbackVx = knockbackVx;
+      if (enemy.type !== 'steam_spirit') {
+        enemy.vy = -215;
+        enemy.onGround = false;
+      }
       this.addFloatingText(enemy.x, enemy.y - 20, 'CRACK!', '#bae6fd');
     }
   }
@@ -349,6 +451,8 @@ export class CoffeePlatformerEngine {
     p.invulnTimer = 1.5;
     p.vy = -410;
     p.vx = -p.facing * 250;
+    p.onGround = false;
+    p.groundPlat = null;
     this.impulseScale(0.65, 1.38, 4.0);
     this.shakeTimer = 0.25;
     this.shakeIntensity = 9;
@@ -359,7 +463,7 @@ export class CoffeePlatformerEngine {
       // Respawn at last checkpoint with full health
       p.hp = p.maxHp;
       p.x = p.checkpointX;
-      p.y = p.checkpointY - 30;
+      p.y = p.checkpointY - 34;
       p.vx = 0;
       p.vy = 0;
       p.shieldActive = this.unlockedPowerups.has('nitro_shield');
@@ -411,7 +515,7 @@ export class CoffeePlatformerEngine {
         const turnBoost = p.vx > 40 ? 2.1 : 1.0;
         if (p.facing === 1 && p.onGround) {
           this.impulseScale(1.18, 0.85, 1.2);
-          this.spawnCoffeeSplash(p.x + 12, p.y + 20, 4, '#fde68a');
+          this.spawnCoffeeSplash(p.x + 12, p.y + 22, 4, '#fde68a');
         }
         p.vx = Math.max(p.vx - baseAccel * turnBoost * dt, -maxSpeed);
         p.facing = -1;
@@ -419,7 +523,7 @@ export class CoffeePlatformerEngine {
         const turnBoost = p.vx < -40 ? 2.1 : 1.0;
         if (p.facing === -1 && p.onGround) {
           this.impulseScale(1.18, 0.85, 1.2);
-          this.spawnCoffeeSplash(p.x - 12, p.y + 20, 4, '#fde68a');
+          this.spawnCoffeeSplash(p.x - 12, p.y + 22, 4, '#fde68a');
         }
         p.vx = Math.min(p.vx + baseAccel * turnBoost * dt, maxSpeed);
         p.facing = 1;
@@ -450,6 +554,7 @@ export class CoffeePlatformerEngine {
     }
 
     // Integrate position
+    const prevX = p.x;
     const prevY = p.y;
     const impactVy = p.vy;
     p.x += p.vx * dt;
@@ -464,18 +569,39 @@ export class CoffeePlatformerEngine {
       p.x = this.level.width - 45;
     }
 
-    // Platform Collisions (One-way top landing + solid standing)
+    // Platform Collisions with Rounded-Edge Contour Following & Ground Snapping
+    // Ensures the hero stays glued to the ground when walking over curved boulders,
+    // biscotti arches, bobbing sugar cubes, and rounded biscuit/cookie corners!
     const wasOnGround = p.onGround;
+    const prevPlat = p.groundPlat;
     p.onGround = false;
+    p.groundPlat = null;
+    p.targetGroundAngle = 0;
 
     for (const plat of this.level.platforms) {
-      const withinX = p.x + p.r * 0.76 > plat.x && p.x - p.r * 0.76 < plat.x + plat.w;
-      const crossedTop = prevY + p.r <= plat.y + 16 && p.y + p.r >= plat.y && p.vy >= 0;
+      const footMargin = p.r * 0.62;
+      const withinX = p.x + footMargin > plat.x && p.x - footMargin < plat.x + plat.w;
+      if (!withinX || p.vy < 0) continue;
 
-      if (withinX && crossedTop) {
-        p.y = plat.y - p.r;
+      const surfY = this.getPlatformSurfaceY(plat, p.x, this.time);
+      const prevSurfY = this.getPlatformSurfaceY(plat, prevX, this.time - dt);
+
+      // Sticky slope/edge snap when already grounded on this or an adjacent platform
+      const isStickyGround =
+        wasOnGround &&
+        (prevPlat === plat || Math.abs(prevY + p.r - surfY) < 22) &&
+        p.y + p.r >= surfY - 20 &&
+        prevY + p.r <= prevSurfY + 24;
+
+      // Standard top-down landing from the air
+      const crossedTop = prevY + p.r <= prevSurfY + 18 && p.y + p.r >= surfY - 2;
+
+      if (isStickyGround || crossedTop) {
+        p.y = surfY - p.r;
         p.vy = 0;
         p.onGround = true;
+        p.groundPlat = plat;
+        p.targetGroundAngle = this.getPlatformSlopeAngle(plat, p.x, this.time);
         p.coyoteTimer = 0.14;
         p.jumpsRemaining = this.unlockedPowerups.has('golden_boost') ? 2 : 1;
 
@@ -488,9 +614,9 @@ export class CoffeePlatformerEngine {
 
           if (plat.type === 'sugar_cube') {
             sound.playSugarCrumble();
-            this.spawnCoffeeSplash(p.x, plat.y, 8, '#bae6fd');
+            this.spawnCoffeeSplash(p.x, surfY, 8, '#bae6fd');
           } else if (impactFactor > 0.55) {
-            this.spawnCoffeeSplash(p.x, plat.y, 6, '#fde68a');
+            this.spawnCoffeeSplash(p.x, surfY, 6, '#fde68a');
           }
         }
 
@@ -502,7 +628,7 @@ export class CoffeePlatformerEngine {
         // Checkpoint activation
         if (plat.isCheckpoint && p.checkpointX < plat.x) {
           p.checkpointX = plat.x + 80;
-          p.checkpointY = plat.y - 34;
+          p.checkpointY = plat.y - 36;
           p.shieldActive = this.unlockedPowerups.has('nitro_shield');
           this.addFloatingText(p.x, p.y - 48, `CHECKPOINT: ${plat.checkpointName.toUpperCase()}!`, '#fde047');
           sound.playProductUnlock();
@@ -521,6 +647,7 @@ export class CoffeePlatformerEngine {
             });
           }
         }
+        break;
       }
     }
 
@@ -528,20 +655,62 @@ export class CoffeePlatformerEngine {
       p.coyoteTimer = 0.14;
     }
 
+    // Smoothly interpolate ground slope alignment so walking onto rounded edges feels buttery-smooth
+    p.groundAngle += (p.targetGroundAngle - p.groundAngle) * Math.min(1, 20 * dt);
+
     // Liquid Hazard check (Falling into Milk Rapids or Boiling Crema Lake)
     if (p.y + p.r > this.level.liquidLevel + 12) {
       this.hurtPlayer();
-      p.y = p.checkpointY - 34;
+      p.y = p.checkpointY - 36;
       p.x = p.checkpointX;
       p.vx = 0;
       p.vy = 0;
     }
 
+    // --- Idle Foot-Tap & Hands-on-Waist State + Facial Blinking & Eye Gaze Tracking ---
+    const isStandingIdle =
+      p.onGround &&
+      Math.abs(p.vx) < 12 &&
+      !moveLeft &&
+      !moveRight &&
+      p.meleeTimer <= 0 &&
+      p.dashTimer <= 0 &&
+      p.shotCooldown <= 0;
+
+    if (isStandingIdle) {
+      p.idleTimer += dt;
+    } else {
+      p.idleTimer = 0;
+    }
+
+    // Smoothly blend into the impatient hands-on-waist & foot-tapping pose when waiting
+    const targetIdleBlend = p.idleTimer > 0.18 ? 1 : 0;
+    p.idleBlend += (targetIdleBlend - p.idleBlend) * Math.min(1, (targetIdleBlend ? 8.5 : 16) * dt);
+
+    // Natural eye blinking cycle (occasional double blink!)
+    p.nextBlink -= dt;
+    if (p.nextBlink <= 0) {
+      p.blinkTimer = 0.14;
+      p.nextBlink = Math.random() < 0.25 ? 0.28 : 2.4 + Math.random() * 2.2;
+    }
+    if (p.blinkTimer > 0) {
+      p.blinkTimer = Math.max(0, p.blinkTimer - dt);
+    }
+
+    // Dynamic eye gaze target (looks ahead when running, up/down when jumping, glances impatiently when idle!)
+    const idleGlanceX = p.idleBlend * Math.sin(this.time * 2.1) * 0.85;
+    const idleGlanceY = p.idleBlend * (Math.cos(this.time * 4.2) * 0.35 - 0.25);
+    const targetLookX = p.idleBlend > 0.5 ? idleGlanceX : Math.max(-1, Math.min(1, p.vx / 220));
+    const targetLookY = !p.onGround ? Math.max(-1, Math.min(1, p.vy / 420)) : idleGlanceY;
+    p.eyeLookX += (targetLookX - p.eyeLookX) * Math.min(1, 14 * dt);
+    p.eyeLookY += (targetLookY - p.eyeLookY) * Math.min(1, 14 * dt);
+
     // --- Harmonic Spring-Damper Squash & Stretch + Liquid Slosh Physics ---
-    // While airborne, target scale subtly stretches with vertical velocity; on ground, target is 1.0 with a lively run bounce
+    // Includes rhythmic body bounce from impatient foot-tapping when idle!
+    const idleTapPulse = p.idleBlend > 0.2 ? Math.sin(this.time * 9.5) * 0.025 * p.idleBlend : 0;
     const runBounce = p.onGround && Math.abs(p.vx) > 25
       ? Math.sin(p.animTime * 18) * 0.065 * Math.min(1, Math.abs(p.vx) / 260)
-      : 0;
+      : idleTapPulse;
     const airStretch = !p.onGround
       ? Math.max(-0.12, Math.min(0.18, Math.abs(p.vy) / 1450))
       : 0;
@@ -563,7 +732,7 @@ export class CoffeePlatformerEngine {
       : Math.max(-0.18, Math.min(0.18, (p.vy * 0.00028))) * p.facing;
     p.tiltAngle += (targetTilt - p.tiltAngle) * 14 * dt;
 
-    const sloshTarget = -p.vx * 0.015;
+    const sloshTarget = -p.vx * 0.015 + p.groundAngle * 4 * p.facing;
     p.sloshVel += ((sloshTarget - p.sloshAngle) * 120 - p.sloshVel * 8) * dt;
     p.sloshAngle += p.sloshVel * dt;
 
@@ -572,8 +741,8 @@ export class CoffeePlatformerEngine {
     // Ambient rising steam & coffee droplets from the hero cup!
     if (Math.random() < 0.35) {
       this.particles.push({
-        x: p.x + (Math.random() - 0.5) * 16,
-        y: p.y - 24,
+        x: p.x + (Math.random() - 0.5) * 18,
+        y: p.y - 28,
         vx: -p.vx * 0.15 + (Math.random() - 0.5) * 20,
         vy: -35 - Math.random() * 35,
         r: 4 + Math.random() * 6,
@@ -630,8 +799,8 @@ export class CoffeePlatformerEngine {
       // Hit enemies
       for (const enemy of this.level.enemies) {
         if (enemy.dead) continue;
-        if (Math.hypot(proj.x - enemy.x, proj.y - enemy.y) < enemy.hp * 4 + 24) {
-          this.damageEnemy(enemy, 1, Math.sign(proj.vx) * 140);
+        if (Math.hypot(proj.x - enemy.x, proj.y - enemy.y) < enemy.hp * 4 + 26) {
+          this.damageEnemy(enemy, 1, Math.sign(proj.vx) * 165);
           proj.pierce--;
           if (proj.pierce <= 0) {
             proj.life = 0;
@@ -645,24 +814,161 @@ export class CoffeePlatformerEngine {
       }
     }
 
-    // Update Enemies (Coffee Bean Grunt, Sugar Cube Hopper, Steam Cloud Spirit)
+    // =========================================================================
+    // Dynamic Enemy Physics, AI Behaviors & Harmonic Squash-and-Stretch
+    // =========================================================================
     for (const enemy of this.level.enemies) {
       if (enemy.dead) continue;
-      if (enemy.type === 'sugar_hopper') {
-        enemy.vx = (enemy.vx >= 0 ? 1 : -1) * 180;
-      }
-      enemy.x += enemy.vx * dt;
-      if (enemy.x < enemy.minX) {
-        enemy.x = enemy.minX;
-        enemy.vx = Math.abs(enemy.vx);
-      } else if (enemy.x > enemy.maxX) {
-        enemy.x = enemy.maxX;
-        enemy.vx = -Math.abs(enemy.vx);
+
+      if (enemy.hitFlashTimer > 0) enemy.hitFlashTimer -= dt;
+      if (enemy.aggroCooldown > 0) enemy.aggroCooldown -= dt;
+
+      // Decay knockback velocity smoothly
+      if (Math.abs(enemy.knockbackVx) > 5) {
+        enemy.x += enemy.knockbackVx * dt;
+        enemy.knockbackVx *= Math.pow(0.82, dt * 60);
+      } else {
+        enemy.knockbackVx = 0;
       }
 
-      if (enemy.type === 'steam_spirit' && enemy.baseY !== undefined) {
-        enemy.y = enemy.baseY + Math.sin(this.time * 3.8 + enemy.x * 0.02) * 14;
+      const distToPlayerX = p.x - enemy.x;
+      const distToPlayerY = p.y - enemy.y;
+      const distToPlayer = Math.hypot(distToPlayerX, distToPlayerY);
+      const dirSign = enemy.vx >= 0 ? 1 : -1;
+
+      if (enemy.type === 'bean_grunt') {
+        // 1. COFFEE BEAN GRUNT:
+        // Heavy stomping gait + spots player within range, does a fierce angry hop, and charges faster!
+        const playerInSight =
+          Math.abs(distToPlayerX) < 250 &&
+          Math.abs(distToPlayerY) < 110 &&
+          Math.sign(distToPlayerX) === dirSign;
+
+        if (playerInSight && !enemy.aggro && enemy.aggroCooldown <= 0 && enemy.onGround) {
+          enemy.aggro = true;
+          enemy.aggroCooldown = 2.4;
+          enemy.vy = -225; // Startled angry hop!
+          enemy.onGround = false;
+          this.impulseEnemyScale(enemy, 0.74, 1.32, 3.2);
+        } else if (Math.abs(distToPlayerX) > 310) {
+          enemy.aggro = false;
+        }
+
+        const speed = enemy.aggro ? enemy.baseSpeed * 1.68 : enemy.baseSpeed;
+        enemy.vx = dirSign * speed;
+        enemy.x += enemy.vx * dt;
+        enemy.animPhase += dt * (enemy.aggro ? 19 : 13);
+
+        // Turnaround at patrol boundaries with snappy squash pop
+        if (enemy.x < enemy.minX) {
+          enemy.x = enemy.minX;
+          enemy.vx = Math.abs(enemy.vx);
+          enemy.aggro = false;
+          this.impulseEnemyScale(enemy, 1.24, 0.80, 1.5);
+        } else if (enemy.x > enemy.maxX) {
+          enemy.x = enemy.maxX;
+          enemy.vx = -Math.abs(enemy.vx);
+          enemy.aggro = false;
+          this.impulseEnemyScale(enemy, 1.24, 0.80, 1.5);
+        }
+
+        // Gravity & platform surface landing for Bean Grunt
+        if (!enemy.onGround || enemy.vy !== 0) {
+          enemy.vy += 1180 * dt;
+          enemy.y += enemy.vy * dt;
+          if (enemy.y >= enemy.groundY) {
+            enemy.y = enemy.groundY;
+            enemy.vy = 0;
+            enemy.onGround = true;
+            this.impulseEnemyScale(enemy, 1.28, 0.76, -2.5);
+          }
+        }
+      } else if (enemy.type === 'sugar_hopper') {
+        // 2. SUGAR CUBE HOPPER:
+        // Uniform fast 180 px/s horizontal speed in both directions + real parabolic hopping physics,
+        // landing compression squash, sugar crystal sparks, and energetic multi-height spring jumps!
+        enemy.vx = dirSign * 180;
+        enemy.x += enemy.vx * dt;
+        enemy.animPhase += dt * 16;
+
+        if (enemy.x < enemy.minX) {
+          enemy.x = enemy.minX;
+          enemy.vx = 180;
+          this.impulseEnemyScale(enemy, 1.26, 0.78, 1.8);
+        } else if (enemy.x > enemy.maxX) {
+          enemy.x = enemy.maxX;
+          enemy.vx = -180;
+          this.impulseEnemyScale(enemy, 1.26, 0.78, 1.8);
+        }
+
+        if (enemy.onGround) {
+          enemy.hopPauseTimer -= dt;
+          if (enemy.hopPauseTimer <= 0) {
+            enemy.hopCount = (enemy.hopCount + 1) % 3;
+            // Every 3rd hop (or when player is close) is an extra-high excited sugar leap!
+            const isHighLeap = enemy.hopCount === 0 || distToPlayer < 200;
+            enemy.vy = isHighLeap ? -365 : -275;
+            enemy.onGround = false;
+            this.impulseEnemyScale(enemy, 0.72, 1.34, 3.6);
+          }
+        } else {
+          enemy.vy += 1220 * dt;
+          enemy.y += enemy.vy * dt;
+          if (enemy.y >= enemy.groundY) {
+            enemy.y = enemy.groundY;
+            enemy.vy = 0;
+            enemy.onGround = true;
+            enemy.hopPauseTimer = 0.055; // Brief ground compression before springing back up!
+            this.impulseEnemyScale(enemy, 1.34, 0.70, -3.2);
+          }
+        }
+      } else if (enemy.type === 'steam_spirit') {
+        // 3. STEAM CLOUD SPIRIT:
+        // Fluid aerial swooping physics, figure-8 weaving, banking into turns, and playful dive toward player!
+        const swoopSpeed = Math.abs(enemy.vx) || 90;
+        enemy.x += enemy.vx * dt;
+        enemy.animPhase += dt * 10;
+
+        if (enemy.x < enemy.minX) {
+          enemy.x = enemy.minX;
+          enemy.vx = swoopSpeed;
+          this.impulseEnemyScale(enemy, 1.22, 0.82, 1.2);
+        } else if (enemy.x > enemy.maxX) {
+          enemy.x = enemy.maxX;
+          enemy.vx = -swoopSpeed;
+          this.impulseEnemyScale(enemy, 1.22, 0.82, 1.2);
+        }
+
+        const baseY = enemy.baseY !== undefined ? enemy.baseY : enemy.groundY;
+        const waveOffset = Math.sin(this.time * 3.8 + enemy.x * 0.022) * 20 + Math.cos(this.time * 6.2) * 6;
+        // Dive closer to player's altitude when player approaches!
+        const playerPull = distToPlayer < 260 ? Math.max(-28, Math.min(36, (p.y - baseY) * 0.35)) : 0;
+        const targetY = baseY + waveOffset + playerPull;
+        const prevEnemyY = enemy.y;
+        enemy.y += (targetY - enemy.y) * Math.min(1, 7.5 * dt);
+        enemy.vy = (enemy.y - prevEnemyY) / Math.max(0.001, dt);
       }
+
+      // Harmonic Spring-Damper Squash & Stretch + Dynamic Lean/Tilt for every enemy
+      const stridePulse = enemy.onGround
+        ? Math.sin(enemy.animPhase) * (enemy.aggro ? 0.08 : 0.05)
+        : Math.max(-0.12, Math.min(0.16, Math.abs(enemy.vy) / 1200));
+      const targetESX = 1 - stridePulse * 0.7;
+      const targetESY = 1 + stridePulse;
+
+      enemy.scaleVx += ((targetESX - enemy.scaleX) * 230 - enemy.scaleVx * 14.5) * dt;
+      enemy.scaleVy += ((targetESY - enemy.scaleY) * 230 - enemy.scaleVy * 14.5) * dt;
+      enemy.scaleX = Math.max(0.58, Math.min(1.48, enemy.scaleX + enemy.scaleVx * dt));
+      enemy.scaleY = Math.max(0.58, Math.min(1.48, enemy.scaleY + enemy.scaleVy * dt));
+
+      const targetEnemyTilt = enemy.type === 'steam_spirit'
+        ? Math.max(-0.24, Math.min(0.24, (enemy.vy * 0.0012) + 0.08))
+        : !enemy.onGround
+          ? Math.max(-0.22, Math.min(0.22, enemy.vy * 0.0005))
+          : enemy.aggro
+            ? 0.14
+            : 0.05;
+      enemy.tiltAngle += (targetEnemyTilt - enemy.tiltAngle) * Math.min(1, 14 * dt);
 
       // Player vs Enemy collision
       const dx = p.x - enemy.x;
@@ -676,7 +982,7 @@ export class CoffeePlatformerEngine {
         if (p.dashTimer > 0 && this.unlockedPowerups.has('nitro_shield')) {
           this.damageEnemy(enemy, 2, p.facing * 260);
         } else if (isStomping) {
-          p.vy = -525;
+          p.vy = -535;
           this.impulseScale(1.36, 0.72, 4.2);
           this.damageEnemy(enemy, 1, 0);
         } else {

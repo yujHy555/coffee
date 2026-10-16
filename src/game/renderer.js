@@ -1110,34 +1110,53 @@ export class WorldRenderer {
     const ctx = this.ctx;
     const facing = enemy.vx >= 0 ? 1 : -1;
     const seed = parseInt(enemy.id?.replace(/\D/g, '') || '1', 10);
-    const walkCycle = Math.sin(time * 13 + seed * 1.7);
+    const phase = enemy.animPhase !== undefined ? enemy.animPhase : time * 13 + seed * 1.7;
+    const walkCycle = Math.sin(phase);
 
     ctx.save();
     ctx.translate(sx, enemy.y);
 
     // Warm ground contact shadow underneath grounded enemies only (No shadow for Steam Cloud Spirit ghosts!)
+    // Stays anchored to the ground surface and scales down dynamically when the enemy hops into the air!
     if (enemy.type !== 'steam_spirit') {
-      ctx.fillStyle = 'rgba(42, 18, 6, 0.28)';
+      const groundDeltaY = enemy.groundY !== undefined ? Math.max(0, enemy.groundY - enemy.y) : 0;
+      const shadowScale = Math.max(0.45, 1 - groundDeltaY / 110);
+      ctx.fillStyle = `rgba(42, 18, 6, ${(0.26 * shadowScale).toFixed(2)})`;
       ctx.beginPath();
-      ctx.ellipse(0, 28, 24, 5.5, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, groundDeltaY + 28, 22 * shadowScale, 5 * shadowScale, 0, 0, Math.PI * 2);
       ctx.fill();
     }
 
+    // Brief hit flash when damaged
+    if (enemy.hitFlashTimer > 0 && Math.floor(time * 30) % 2 === 0) {
+      ctx.filter = 'brightness(1.55)';
+    }
+
     ctx.scale(facing, 1);
+
+    // Apply harmonic spring-damper squash-and-stretch + dynamic velocity/charge tilt anchored at the feet!
+    const esx = enemy.scaleX || 1;
+    const esy = enemy.scaleY || 1;
+    const etilt = enemy.tiltAngle || 0;
+    const pivotY = enemy.type === 'steam_spirit' ? 0 : 26;
+    ctx.translate(0, pivotY);
+    ctx.rotate(etilt);
+    ctx.scale(esx, esy);
+    ctx.translate(0, -pivotY);
 
     if (enemy.type === 'bean_grunt') {
       // =========================================================================
       // 1. COFFEE BEAN GRUNT (Exact match to Top Row of Enemy Character Sheet!)
       // Vertical roasted coffee bean with top notch, S-cleft, angry white eyes,
       // furrowed V-brow, rosy cheeks, frown, clenched fists, and maroon boots
+      // + Dynamic Aggro Charge Steam & Faster Stride!
       // =========================================================================
       const outlineCol = '#3B1A0B';
-      const limbCol = '#4D2310';
 
       // Back Arm (curved outward with clenched fist)
       ctx.save();
       ctx.translate(-15, 2);
-      ctx.rotate(-walkCycle * 0.28);
+      ctx.rotate(-walkCycle * (enemy.aggro ? 0.48 : 0.28));
       ctx.strokeStyle = outlineCol;
       ctx.lineWidth = 4.6;
       ctx.lineCap = 'round';
@@ -1186,12 +1205,14 @@ export class WorldRenderer {
         ctx.restore();
       };
 
-      drawGruntBoot(-7 + walkCycle * 6, 21 - Math.max(0, -walkCycle) * 3, -walkCycle * 0.3);
-      drawGruntBoot(7 - walkCycle * 6, 22 - Math.max(0, walkCycle) * 3, walkCycle * 0.3);
+      const strideAmp = enemy.aggro ? 8.5 : 6;
+      const liftAmp = enemy.aggro ? 4.8 : 3;
+      drawGruntBoot(-7 + walkCycle * strideAmp, 21 - Math.max(0, -walkCycle) * liftAmp, -walkCycle * 0.38);
+      drawGruntBoot(7 - walkCycle * strideAmp, 22 - Math.max(0, walkCycle) * liftAmp, walkCycle * 0.38);
 
       // Vertical Roasted Bean Body with top cleft notch
       const beanGrad = ctx.createRadialGradient(-4, -8, 4, 0, 0, 26);
-      beanGrad.addColorStop(0, '#9E5834');
+      beanGrad.addColorStop(0, enemy.aggro ? '#B35D32' : '#9E5834');
       beanGrad.addColorStop(0.55, '#783D1E');
       beanGrad.addColorStop(1, '#522611');
 
@@ -1225,7 +1246,7 @@ export class WorldRenderer {
 
       // Angry White Eyes with Dark Pupils & Furrowed V-Brow
       ctx.save();
-      ctx.translate(3, 0);
+      ctx.translate(3, (esx - 1) * 2);
 
       // Left Eye
       ctx.fillStyle = '#FFFFFF';
@@ -1243,49 +1264,57 @@ export class WorldRenderer {
       ctx.stroke();
 
       // Pupils & tiny white catchlights
+      const pupilShift = enemy.aggro ? 0.8 : 0;
       ctx.fillStyle = '#1F0D05';
       ctx.beginPath();
-      ctx.arc(-5.5, -2.8, 2, 0, Math.PI * 2);
-      ctx.arc(6.8, -2.8, 2, 0, Math.PI * 2);
+      ctx.arc(-5.5 + pupilShift, -2.8, 2, 0, Math.PI * 2);
+      ctx.arc(6.8 + pupilShift, -2.8, 2, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = '#FFFFFF';
       ctx.beginPath();
-      ctx.arc(-6, -3.5, 0.8, 0, Math.PI * 2);
-      ctx.arc(6.3, -3.5, 0.8, 0, Math.PI * 2);
+      ctx.arc(-6 + pupilShift, -3.5, 0.8, 0, Math.PI * 2);
+      ctx.arc(6.3 + pupilShift, -3.5, 0.8, 0, Math.PI * 2);
       ctx.fill();
 
-      // Deep Furrowed V-Eyebrows
+      // Deep Furrowed V-Eyebrows (furrow deeper when charging!)
+      const browDrop = enemy.aggro ? 1.2 : 0;
       ctx.strokeStyle = outlineCol;
       ctx.lineWidth = 2.8;
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(-12, -8.5);
-      ctx.lineTo(-2, -4.8);
+      ctx.lineTo(-2, -4.8 + browDrop);
       ctx.moveTo(11.5, -8.5);
-      ctx.lineTo(2.5, -4.8);
+      ctx.lineTo(2.5, -4.8 + browDrop);
       ctx.stroke();
 
       // Warm Rosy Cheeks (#D97762)
-      ctx.fillStyle = 'rgba(225, 118, 98, 0.65)';
+      ctx.fillStyle = enemy.aggro ? 'rgba(239, 95, 75, 0.8)' : 'rgba(225, 118, 98, 0.65)';
       ctx.beginPath();
       ctx.ellipse(-9.5, 2, 2.8, 1.6, 0, 0, Math.PI * 2);
       ctx.ellipse(9.5, 2, 2.6, 1.5, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Grumpy Curved Frown
+      // Grumpy Curved Frown (or open growl when charging!)
       ctx.strokeStyle = outlineCol;
       ctx.lineWidth = 2.2;
       ctx.beginPath();
-      ctx.moveTo(-3.5, 3.8);
-      ctx.quadraticCurveTo(0.5, 0.5, 4.2, 3.8);
-      ctx.stroke();
+      if (enemy.aggro) {
+        ctx.fillStyle = '#3B1A0B';
+        ctx.ellipse(0.5, 3.2, 3.8, 2.2, 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.moveTo(-3.5, 3.8);
+        ctx.quadraticCurveTo(0.5, 0.5, 4.2, 3.8);
+        ctx.stroke();
+      }
       ctx.restore();
 
       // Foreground Arm & Clenched Fist
       ctx.save();
       ctx.translate(-14, 3);
-      ctx.rotate(walkCycle * 0.35);
+      ctx.rotate(walkCycle * (enemy.aggro ? 0.55 : 0.35));
       ctx.strokeStyle = outlineCol;
       ctx.lineWidth = 4.8;
       ctx.lineCap = 'round';
@@ -1303,13 +1332,11 @@ export class WorldRenderer {
     } else if (enemy.type === 'sugar_hopper') {
       // =========================================================================
       // 2. SUGAR CUBE HOPPER (Exact match to Middle Row of Enemy Character Sheet!)
-      // 3D Isometric Crystalline White Sugar Cube with bumpy granular edges,
-      // excited wide eyes, open laughing/shouting mouth with tongue, raised front
-      // fist, trailing back arm, and Red-and-White Striped Sneakers!
+      // 3D Isometric Crystalline White Sugar Cube with real parabolic hop physics,
+      // squash-and-stretch landing compression, and Red-and-White Striped Sneakers!
       // =========================================================================
       const outlineCol = '#4A2512';
-      const hopY = Math.abs(Math.sin(time * 9 + seed * 1.3)) * -10;
-      ctx.translate(0, hopY);
+      const airFactor = !enemy.onGround ? Math.max(-1, Math.min(1, enemy.vy / 320)) : 0;
 
       // Speed / Hop motion lines behind cube (as shown in sheet!)
       ctx.strokeStyle = 'rgba(180, 155, 135, 0.55)';
@@ -1371,15 +1398,16 @@ export class WorldRenderer {
         ctx.restore();
       };
 
+      const legSpread = !enemy.onGround ? 6 : walkCycle * 7;
       // Back Leg & Sneaker
-      drawHopperSneaker(-8 - walkCycle * 7, 19, walkCycle * 0.45 + 0.2);
-      // Front Leg & Sneaker (kicking forward!)
-      drawHopperSneaker(8 + walkCycle * 7, 18, -walkCycle * 0.45 - 0.35);
+      drawHopperSneaker(-8 - legSpread, 19, (!enemy.onGround ? 0.45 : walkCycle * 0.45) + 0.2);
+      // Front Leg & Sneaker (kicking forward in mid-air!)
+      drawHopperSneaker(8 + legSpread, 18, (!enemy.onGround ? -0.5 + airFactor * 0.25 : -walkCycle * 0.45) - 0.3);
 
       // Trailing Left Arm (-X)
       ctx.save();
       ctx.translate(-18, 2);
-      ctx.rotate(0.35 + walkCycle * 0.25);
+      ctx.rotate(0.35 + walkCycle * 0.3 - airFactor * 0.35);
       ctx.strokeStyle = outlineCol;
       ctx.lineWidth = 5;
       ctx.lineCap = 'round';
@@ -1448,7 +1476,7 @@ export class WorldRenderer {
 
       // Excited Face on the Front/Right Cube Plane
       ctx.save();
-      ctx.translate(8, 1);
+      ctx.translate(8, 1 + airFactor * 1.5);
 
       // Wide Oval White Eyes with Big Dark Pupils
       ctx.fillStyle = '#FFFFFF';
@@ -1462,25 +1490,25 @@ export class WorldRenderer {
 
       ctx.fillStyle = '#2B1408';
       ctx.beginPath();
-      ctx.ellipse(-4, -3.2, 2, 2.8, 0, 0, Math.PI * 2);
-      ctx.ellipse(5.2, -3.9, 1.9, 2.7, 0, 0, Math.PI * 2);
+      ctx.ellipse(-4, -3.2 + airFactor * 0.8, 2, 2.8, 0, 0, Math.PI * 2);
+      ctx.ellipse(5.2, -3.9 + airFactor * 0.8, 1.9, 2.7, 0, 0, Math.PI * 2);
       ctx.fill();
 
       // Eye Catchlights
       ctx.fillStyle = '#FFFFFF';
       ctx.beginPath();
-      ctx.arc(-4.6, -4.6, 0.9, 0, Math.PI * 2);
-      ctx.arc(4.6, -5.2, 0.9, 0, Math.PI * 2);
+      ctx.arc(-4.6, -4.6 + airFactor * 0.6, 0.9, 0, Math.PI * 2);
+      ctx.arc(4.6, -5.2 + airFactor * 0.6, 0.9, 0, Math.PI * 2);
       ctx.fill();
 
       // Expressive Arched Eyebrows
       ctx.strokeStyle = outlineCol;
       ctx.lineWidth = 2.2;
       ctx.beginPath();
-      ctx.moveTo(-7.5, -9);
-      ctx.lineTo(-2, -8.5);
-      ctx.moveTo(2.5, -9.5);
-      ctx.lineTo(7.5, -9.5);
+      ctx.moveTo(-7.5, -9 - (!enemy.onGround ? 1.2 : 0));
+      ctx.lineTo(-2, -8.5 - (!enemy.onGround ? 1.2 : 0));
+      ctx.moveTo(2.5, -9.5 - (!enemy.onGround ? 1.2 : 0));
+      ctx.lineTo(7.5, -9.5 - (!enemy.onGround ? 1.2 : 0));
       ctx.stroke();
 
       // Pink Cheeks
@@ -1497,7 +1525,7 @@ export class WorldRenderer {
       ctx.beginPath();
       ctx.moveTo(-3.8, 1);
       ctx.lineTo(4.2, 0.2);
-      ctx.bezierCurveTo(4.8, 7.5, -4.2, 8, -3.8, 1);
+      ctx.bezierCurveTo(4.8, 7.5 + (!enemy.onGround ? 1.5 : 0), -4.2, 8 + (!enemy.onGround ? 1.5 : 0), -3.8, 1);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
@@ -1511,7 +1539,7 @@ export class WorldRenderer {
       // Raised Cheering Front Arm (+X) with Fist
       ctx.save();
       ctx.translate(18, 0);
-      ctx.rotate(-0.4 + walkCycle * 0.25);
+      ctx.rotate(-0.4 + walkCycle * 0.25 - (!enemy.onGround ? 0.35 : 0));
       ctx.strokeStyle = outlineCol;
       ctx.lineWidth = 5;
       ctx.lineCap = 'round';
@@ -1534,13 +1562,12 @@ export class WorldRenderer {
       // =========================================================================
       // 3. STEAM CLOUD SPIRIT (Exact match to Bottom Row of Enemy Character Sheet!)
       // Floating creamy-white wispy steam ghost with top curl crest, inner spiral
-      // curls, mischievous eyes & smirk, floating wisp hands, and tapering tail!
+      // curls, mischievous eyes & smirk, floating wisp hands, and undulating tail!
       // =========================================================================
       const outlineCol = '#5E3A22';
-      const bob = Math.sin(time * 4.5 + enemy.x * 0.03) * 3;
-      ctx.translate(0, bob);
+      const tailWave = Math.sin(phase * 1.1) * 4.5;
 
-      // Sculpted Wispy Steam Body with Top Curl Crest & Trailing Tail (Matches SIDE/FRONT sheet!)
+      // Sculpted Wispy Steam Body with Top Curl Crest & Undulating Ghostly Tail
       const spiritGrad = ctx.createRadialGradient(2, -4, 4, 0, 0, 28);
       spiritGrad.addColorStop(0, '#FFFDF9');
       spiritGrad.addColorStop(0.65, '#F5E9D6');
@@ -1556,11 +1583,11 @@ export class WorldRenderer {
       ctx.moveTo(-8, -24);
       ctx.bezierCurveTo(-2, -28, 12, -25, 17, -15);
       ctx.bezierCurveTo(23, -8, 22, 6, 15, 14);
-      // Bottom sweeping ghostly tail curling back to the left (-X)
-      ctx.bezierCurveTo(8, 22, -8, 24, -22, 20);
-      ctx.bezierCurveTo(-30, 17, -31, 9, -25, 7);
-      ctx.bezierCurveTo(-21, 6, -19, 12, -23, 13);
-      ctx.quadraticCurveTo(-14, 15, -12, 8);
+      // Bottom sweeping ghostly tail curling back to the left (-X) with dynamic wave!
+      ctx.bezierCurveTo(8, 22, -8, 24 + tailWave * 0.5, -22, 20 + tailWave);
+      ctx.bezierCurveTo(-30, 17 + tailWave, -31, 9 + tailWave, -25, 7 + tailWave * 0.8);
+      ctx.bezierCurveTo(-21, 6 + tailWave * 0.6, -19, 12 + tailWave * 0.5, -23, 13 + tailWave * 0.7);
+      ctx.quadraticCurveTo(-14, 15 + tailWave * 0.4, -12, 8);
       // Left billowing cloud puffs
       ctx.bezierCurveTo(-21, 4, -22, -8, -14, -13);
       ctx.bezierCurveTo(-18, -18, -14, -24, -8, -24);
@@ -1633,17 +1660,20 @@ export class WorldRenderer {
       ctx.stroke();
       ctx.restore();
 
-      // Wispy Curling Arms (Front & Side)
+      // Wispy Curling Arms (Front & Side) swaying with aerial motion
+      ctx.save();
+      ctx.translate(16, 4);
+      ctx.rotate(Math.sin(phase * 0.9) * 0.25);
       ctx.strokeStyle = outlineCol;
       ctx.fillStyle = '#F5E9D6';
       ctx.lineWidth = 2.2;
-      // Front reaching wisp hand
       ctx.beginPath();
-      ctx.moveTo(16, 4);
-      ctx.quadraticCurveTo(25, 1, 25, 7);
-      ctx.quadraticCurveTo(23, 11, 15, 8);
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(9, -3, 9, 3);
+      ctx.quadraticCurveTo(7, 7, -1, 4);
       ctx.fill();
       ctx.stroke();
+      ctx.restore();
     }
 
     ctx.restore();
@@ -1657,12 +1687,17 @@ export class WorldRenderer {
     ctx.save();
     ctx.translate(sx, sy);
 
-    // Subtle, much smaller ground contact shadow beneath the protagonist's boots
+    // Subtle, much smaller ground contact shadow beneath the protagonist's boots,
+    // tilted to match rounded platform edges and slopes!
     if (player.onGround) {
+      ctx.save();
+      ctx.translate(0, player.r);
+      ctx.rotate(player.groundAngle || 0);
       ctx.fillStyle = 'rgba(42, 18, 6, 0.2)';
       ctx.beginPath();
-      ctx.ellipse(0, 29, 12, 2.6, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, 12.5, 2.6, 0, 0, Math.PI * 2);
       ctx.fill();
+      ctx.restore();
     }
 
     // Invulnerability flash
@@ -1676,7 +1711,7 @@ export class WorldRenderer {
       ctx.fillStyle = 'rgba(251, 207, 232, 0.2)';
       ctx.lineWidth = 2.2;
       ctx.beginPath();
-      ctx.arc(0, -4, 46 + Math.sin(time * 6) * 3, 0, Math.PI * 2);
+      ctx.arc(0, -4, 52 + Math.sin(time * 6) * 3, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     }
@@ -1685,16 +1720,26 @@ export class WorldRenderer {
     const speedRatio = Math.min(1, Math.abs(player.vx) / 135);
     const isAction = !player.onGround || player.meleeTimer > 0 || player.shotCooldown > 0.1;
     const sideMix = isAction ? Math.max(0.82, speedRatio) : speedRatio * 0.9;
+    const idleBlend = player.idleBlend || 0;
 
+    // Rhythmic impatient foot-tapping cycle when waiting in idle!
+    const tapRaw = Math.sin(time * 9.5);
+    const tapLift = Math.max(0, tapRaw); // Lifts toe up on positive half-wave, snaps down to ground on 0
+
+    // Rotate around the ground contact point (player.r) by the platform's rounded-edge slope angle
+    // before flipping horizontally so slope rotation always matches the terrain contour!
+    const slopeTilt = player.onGround ? (player.groundAngle || 0) * 0.78 : 0;
+    ctx.translate(0, player.r);
+    ctx.rotate(slopeTilt);
     ctx.scale(player.facing, 1);
 
-    // Anchor squash & stretch at the bottom of the boots (+28px) so the cup compresses into the ground
-    // and springs upward from its feet, plus slightly larger overall hero scale (1.18x)!
-    const heroScale = 1.18;
-    const tilt = player.tiltAngle !== undefined ? player.tiltAngle : player.vx * 0.00038 * player.facing;
+    // Anchor squash & stretch at the bottom of the boots (+28px local) and scale up to 1.38x
+    // for an even larger, commanding hero presence with crisp, refined thin linework!
+    const heroScale = 1.38;
+    const dynamicTilt = player.tiltAngle !== undefined ? player.tiltAngle : player.vx * 0.00038 * player.facing;
+    const idleHipTilt = idleBlend * (-0.035 + Math.sin(time * 9.5) * 0.015);
 
-    ctx.translate(0, 28);
-    ctx.rotate(tilt);
+    ctx.rotate(dynamicTilt + idleHipTilt);
     ctx.scale(player.scaleX * heroScale, player.scaleY * heroScale);
     ctx.translate(0, -28);
 
@@ -1704,49 +1749,81 @@ export class WorldRenderer {
       ? Math.sin(player.animTime * 16) * Math.min(1, Math.abs(player.vx) / 160)
       : -0.58;
 
-    // --- 1. Far/Reaching Arm (In FRONT VIEW: cheerful raised waving arm; In SIDE VIEW: extends forward with secondary bounce!) ---
+    // Slight sassy hip shift over the standing leg when hands are on his waist in idle
+    const hipShiftX = idleBlend * -1.4;
+    const hipBobY = idleBlend * Math.abs(Math.sin(time * 9.5)) * 0.9;
+
+    // --- 1. Far/Left Arm (In IDLE: Hand resting on left waist/hip! When moving: waves or swings!) ---
     ctx.save();
-    const waveX = (1 - sideMix) * -23 + sideMix * 19;
-    const waveY = (1 - sideMix) * 1 + sideMix * 3 + (player.scaleY - 1) * -4;
-    ctx.translate(waveX, waveY);
-    this.drawProtagonistArm(
-      ctx,
-      sideMix > 0.45 ? 1 : -1,
-      true,
-      false,
-      0,
-      false,
-      runSwing * 0.42 + Math.sin(time * 6.5) * 0.09
-    );
+    if (idleBlend > 0.5 && !isAction) {
+      // Left arm bent akimbo with hand planted firmly on the left waist/hip of the cup!
+      this.drawWaistArm(ctx, -1, tapLift, hipShiftX, hipBobY);
+    } else {
+      const waveX = (1 - sideMix) * -23 + sideMix * 19;
+      const waveY = (1 - sideMix) * 1 + sideMix * 3 + (player.scaleY - 1) * -4;
+      ctx.translate(waveX, waveY);
+      this.drawProtagonistArm(
+        ctx,
+        sideMix > 0.45 ? 1 : -1,
+        true,
+        false,
+        0,
+        false,
+        runSwing * 0.42 + Math.sin(time * 6.5) * 0.09
+      );
+    }
     ctx.restore();
 
-    // --- 2. Legs & Cuffed Red Boots (With thinner, ultra-crisp linework!) ---
-    const stride = runSwing * 11;
-    const leftLegX = -8 + sideMix * 5 + stride;
-    const rightLegX = 8 - sideMix * 3 - stride;
+    // --- 2. Legs & Cuffed Red Boots (With Impatient Foot-Tapping in Idle!) ---
+    const stride = runSwing * 11 * (1 - idleBlend);
+    const leftLegX = -8.5 + sideMix * 5 + stride;
+    const rightLegX = 8.5 + idleBlend * 1.8 - sideMix * 3 - stride;
 
-    // Far/Back Boot
+    // Left / Standing Boot (Planted solidly during idle foot-tapping)
     this.drawCupBoot(
       leftLegX,
-      20 - Math.max(0, -runSwing) * 4.5,
-      -runSwing * 0.42,
-      0.25 + sideMix * 0.65
-    );
-    // Near/Front Boot
-    this.drawCupBoot(
-      rightLegX,
-      21 - Math.max(0, runSwing) * 4.5,
-      runSwing * 0.42,
-      0.35 + sideMix * 0.65
+      20.2 - Math.max(0, -runSwing) * 4.5 * (1 - idleBlend),
+      -runSwing * 0.42 * (1 - idleBlend),
+      0.25 + sideMix * 0.65,
+      0
     );
 
-    // --- 3. Handle in FRONT VIEW (Sits on the side of the cup when sideMix is low) ---
+    // Right / Tapping Boot (Pivots on heel & taps toe impatiently when waiting in idle!)
+    const tapToeAngle = idleBlend * (-tapLift * 0.44);
+    this.drawCupBoot(
+      rightLegX,
+      20.8 - Math.max(0, runSwing) * 4.5 * (1 - idleBlend),
+      runSwing * 0.42 * (1 - idleBlend),
+      0.38 + sideMix * 0.62 + idleBlend * 0.25,
+      tapToeAngle
+    );
+
+    // Subtle rhythmic tap lines near the tapping boot toe when it strikes the ground in idle!
+    if (idleBlend > 0.65 && tapRaw < -0.75) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(253, 230, 138, 0.75)';
+      ctx.lineWidth = 1.3;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(rightLegX + 9, 25);
+      ctx.lineTo(rightLegX + 12.5, 23);
+      ctx.moveTo(rightLegX + 10, 27.5);
+      ctx.lineTo(rightLegX + 14, 27);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // --- 3. Upper Body Group (with subtle hip shift & breathing during idle) ---
+    ctx.save();
+    ctx.translate(hipShiftX, hipBobY);
+
+    // Handle in FRONT VIEW (Sits on the side of the cup when sideMix is low)
     if (sideMix < 0.55) {
       ctx.save();
       ctx.translate(23, -1);
       ctx.fillStyle = '#E8CFB0';
       ctx.strokeStyle = outlineCol;
-      ctx.lineWidth = 2.0;
+      ctx.lineWidth = 1.75;
       ctx.beginPath();
       ctx.arc(0, 0, 11.5, -Math.PI * 0.55, Math.PI * 0.55);
       ctx.closePath();
@@ -1766,7 +1843,7 @@ export class WorldRenderer {
     ctx.save();
     ctx.fillStyle = '#F5E3C8';
     ctx.strokeStyle = outlineCol;
-    ctx.lineWidth = 2.1;
+    ctx.lineWidth = 1.8;
     ctx.lineJoin = 'round';
 
     ctx.beginPath();
@@ -1801,7 +1878,7 @@ export class WorldRenderer {
 
     // Re-stroke outer cup contour cleanly with refined thin linework
     ctx.strokeStyle = outlineCol;
-    ctx.lineWidth = 2.1;
+    ctx.lineWidth = 1.8;
     ctx.beginPath();
     ctx.moveTo(-25, -16);
     ctx.lineTo(25, -16);
@@ -1813,7 +1890,7 @@ export class WorldRenderer {
     // --- 5. Thick Ceramic Top Rim, Bubbly Crema Foam & Dynamic Slosh-Reactive Splash Crown ---
     ctx.fillStyle = '#FFF6E8';
     ctx.strokeStyle = outlineCol;
-    ctx.lineWidth = 2.0;
+    ctx.lineWidth = 1.75;
     ctx.beginPath();
     ctx.ellipse(0, -16, 25, 7.2, 0, 0, Math.PI * 2);
     ctx.fill();
@@ -1828,7 +1905,7 @@ export class WorldRenderer {
     const slosh = Math.sin(time * 9.5) * 2.2 + (player.sloshAngle || 0) * 0.45;
     ctx.fillStyle = '#5A2E17';
     ctx.strokeStyle = outlineCol;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.3;
     ctx.beginPath();
     ctx.ellipse(0, -15.2, 20.5, 4.6, 0, 0, Math.PI * 2);
     ctx.fill();
@@ -1837,7 +1914,7 @@ export class WorldRenderer {
     // Sculpted Bubbly Sloshing Coffee Wave & Crema Bubbles inside the rim
     ctx.fillStyle = '#6E381D';
     ctx.strokeStyle = outlineCol;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.3;
     ctx.beginPath();
     ctx.moveTo(-18, -15.5);
     ctx.quadraticCurveTo(-11, -21 + slosh * 0.7, -3, -17);
@@ -1857,7 +1934,7 @@ export class WorldRenderer {
     bubbles.forEach((b) => {
       ctx.fillStyle = '#C88A5A';
       ctx.strokeStyle = outlineCol;
-      ctx.lineWidth = 1.0;
+      ctx.lineWidth = 0.95;
       ctx.beginPath();
       ctx.arc(b.bx, b.by, b.br, 0, Math.PI * 2);
       ctx.fill();
@@ -1890,89 +1967,198 @@ export class WorldRenderer {
       const bounce = Math.sin(time * 11 + idx * 1.4) * 2.8 + (player.scaleY - 1) * -8;
       ctx.fillStyle = '#6E381D';
       ctx.strokeStyle = outlineCol;
-      ctx.lineWidth = 1.2;
+      ctx.lineWidth = 1.1;
       ctx.beginPath();
       ctx.arc(d.dx, d.dy + bounce, d.r, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     });
 
-    // --- 6. Character Sheet Face (With expressive squash/stretch eye & mouth reactions!) ---
+    // =========================================================================
+    // 6. EXPRESSIVE ANIMATED FACE (Blinking, Gaze Tracking, Eyebrows & Mouth!)
+    // =========================================================================
     const faceShiftX = sideMix * 11.5;
     const faceFollowY = (player.scaleY - 1) * -3.5;
+    const isBlinking = (player.blinkTimer || 0) > 0;
+    const isHurtFace = (player.invulnTimer || 0) > 0.85;
+    const isAttackingFace = player.meleeTimer > 0 || player.dashTimer > 0 || player.shotCooldown > 0.08;
+    const lookX = (player.eyeLookX || 0) * 1.15;
+    const lookY = (player.eyeLookY || 0) * 1.0;
+
     ctx.save();
     ctx.translate(faceShiftX, faceFollowY);
 
-    // Left/Near Eye
     const leftEyeX = -9.5 + sideMix * 5.5;
     const leftEyeScaleX = 1 - sideMix * 0.22;
-    ctx.fillStyle = outlineCol;
-    ctx.beginPath();
-    ctx.ellipse(leftEyeX, -1.5, 3.2 * leftEyeScaleX, 3.9, 0, 0, Math.PI * 2);
-    ctx.fill();
+    const rightEyeX = 9.5 - sideMix * 1.5;
+    const rightEyeScaleX = 1 - sideMix * 0.35;
 
-    ctx.fillStyle = '#FFFFFF';
-    ctx.beginPath();
-    ctx.arc(leftEyeX + 0.9 * leftEyeScaleX, -2.8, 1.25 * leftEyeScaleX, 0, Math.PI * 2);
-    ctx.fill();
+    // --- 6a. Animated Expressive Eyebrows ---
+    ctx.strokeStyle = outlineCol;
+    ctx.lineWidth = 1.45;
+    ctx.lineCap = 'round';
 
-    // Right/Far Eye
+    // Left Eyebrow (Raises in jump excitement, angles in action, or tilts with impatience in idle!)
+    const jumpBrowLift = !player.onGround ? -1.8 : 0;
+    const idleLeftBrow = idleBlend * (0.8 + tapLift * 0.6);
+    const idleRightBrow = idleBlend * (-1.6 - tapLift * 0.9); // Cocked sassy brow when waiting!
+    const actionBrowTilt = isAttackingFace ? 1.6 : 0;
+
+    ctx.beginPath();
+    ctx.moveTo(leftEyeX - 3.4 * leftEyeScaleX, -6.5 + jumpBrowLift - actionBrowTilt * 0.5 + idleLeftBrow * 0.4);
+    ctx.quadraticCurveTo(
+      leftEyeX,
+      -8.0 + jumpBrowLift + idleLeftBrow,
+      leftEyeX + 3.2 * leftEyeScaleX,
+      -6.2 + jumpBrowLift + actionBrowTilt
+    );
+    ctx.stroke();
+
     if (sideMix < 0.78) {
-      const rightEyeX = 9.5 - sideMix * 1.5;
-      const rightEyeScaleX = 1 - sideMix * 0.35;
-      ctx.fillStyle = outlineCol;
       ctx.beginPath();
-      ctx.ellipse(rightEyeX, -1.5, 3.2 * rightEyeScaleX, 3.9, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.arc(rightEyeX + 0.9 * rightEyeScaleX, -2.8, 1.25 * rightEyeScaleX, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(rightEyeX - 3.0 * rightEyeScaleX, -6.2 + jumpBrowLift + actionBrowTilt);
+      ctx.quadraticCurveTo(
+        rightEyeX,
+        -8.2 + jumpBrowLift + idleRightBrow,
+        rightEyeX + 3.4 * rightEyeScaleX,
+        -6.4 + jumpBrowLift - actionBrowTilt * 0.5 + idleRightBrow * 0.5
+      );
+      ctx.stroke();
     }
 
-    // Warm Coral-Pink Oval Cheeks (#F19483)
+    // --- 6b. Animated Eyes (Open with tracking catchlights, Blinking eyelids, or Hurt '> <' wince) ---
+    const drawAnimatedEye = (ex, scaleX, isLeft) => {
+      if (isHurtFace) {
+        // Squeezed '> <' wince eyes when hurt!
+        ctx.strokeStyle = outlineCol;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        if (isLeft) {
+          ctx.moveTo(ex - 2.8 * scaleX, -3.5);
+          ctx.lineTo(ex + 2.2 * scaleX, -1.2);
+          ctx.lineTo(ex - 2.8 * scaleX, 1.2);
+        } else {
+          ctx.moveTo(ex + 2.8 * scaleX, -3.5);
+          ctx.lineTo(ex - 2.2 * scaleX, -1.2);
+          ctx.lineTo(ex + 2.8 * scaleX, 1.2);
+        }
+        ctx.stroke();
+      } else if (isBlinking) {
+        // Crisp curved closed eyelid arc during natural blink
+        ctx.strokeStyle = outlineCol;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(ex - 3.3 * scaleX, -1.0);
+        ctx.quadraticCurveTo(ex, 1.4, ex + 3.3 * scaleX, -1.0);
+        ctx.stroke();
+      } else {
+        // Open glossy dark espresso eyes with gaze-tracking catchlights!
+        const eyeStretchY = !player.onGround ? 1.08 : 1.0 - idleBlend * 0.06;
+        ctx.fillStyle = outlineCol;
+        ctx.beginPath();
+        ctx.ellipse(ex + lookX * 0.45, -1.5 + lookY * 0.4, 3.2 * scaleX, 3.9 * eyeStretchY, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Half-lidded sassy upper eyelid line when waiting impatiently in idle
+        if (idleBlend > 0.55) {
+          ctx.fillStyle = '#F5E3C8';
+          ctx.beginPath();
+          ctx.ellipse(ex + lookX * 0.45, -4.4, 3.6 * scaleX, 1.6 * idleBlend, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Primary & secondary white specular catchlights
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(ex + (0.9 + lookX * 0.65) * scaleX, -2.8 + lookY * 0.55, 1.25 * scaleX, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(ex - (1.1 - lookX * 0.35) * scaleX, 0.3 + lookY * 0.35, 0.55 * scaleX, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    };
+
+    drawAnimatedEye(leftEyeX, leftEyeScaleX, true);
+    if (sideMix < 0.78) {
+      drawAnimatedEye(rightEyeX, rightEyeScaleX, false);
+    }
+
+    // --- 6c. Warm Coral-Pink Oval Cheeks (#F19483) that puff slightly with expression ---
+    const cheekPulse = 1 + Math.sin(time * 8) * 0.05;
     ctx.fillStyle = '#F19483';
     ctx.beginPath();
-    ctx.ellipse(leftEyeX - 3.2 * (1 - sideMix * 0.4), 3.8, 4.2, 2.3, 0, 0, Math.PI * 2);
+    ctx.ellipse(leftEyeX - 3.2 * (1 - sideMix * 0.4), 3.8, 4.2 * cheekPulse, 2.3, 0, 0, Math.PI * 2);
     ctx.fill();
 
     if (sideMix < 0.72) {
       ctx.beginPath();
-      ctx.ellipse(12.2, 3.8, 3.8, 2.2, 0, 0, Math.PI * 2);
+      ctx.ellipse(12.2, 3.8, 3.8 * cheekPulse, 2.2, 0, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // Happy Open Smile with Coral Tongue (#4A2112 cavity + #F08070 tongue)
+    // --- 6d. Expressive Context-Reactive Mouth ---
     const mouthX = sideMix * 5.8;
     ctx.save();
     ctx.translate(mouthX, 2.2);
     ctx.fillStyle = '#4A2112';
     ctx.strokeStyle = outlineCol;
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(-3.8 * (1 - sideMix * 0.25), -0.5);
-    ctx.quadraticCurveTo(0, 0.8, 3.8, -0.5);
-    ctx.bezierCurveTo(4.2, 5.2, -4.2 * (1 - sideMix * 0.25), 5.2, -3.8 * (1 - sideMix * 0.25), -0.5);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+    ctx.lineWidth = 1.3;
 
-    ctx.fillStyle = '#F08070';
-    ctx.beginPath();
-    ctx.ellipse(0, 2.5, 2.3 * (1 - sideMix * 0.2), 1.4, 0, 0, Math.PI * 2);
-    ctx.fill();
+    if (isHurtFace) {
+      // Surprised / wincing 'O' mouth when hurt
+      ctx.beginPath();
+      ctx.ellipse(0, 2.0, 2.6, 3.1, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    } else if (!player.onGround && player.vy > 200) {
+      // Excited wind-rushing 'O' mouth when diving/falling fast!
+      ctx.beginPath();
+      ctx.ellipse(0.4, 1.8, 2.8, 3.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#F08070';
+      ctx.beginPath();
+      ctx.ellipse(0.4, 3.2, 1.8, 1.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (idleBlend > 0.55 && !isAttackingFace) {
+      // Impatient / sassy side-smirk pulsing rhythmically with the foot tap!
+      const tapSmirk = tapLift * 0.9;
+      ctx.beginPath();
+      ctx.moveTo(-3.4, 1.2 + tapSmirk * 0.3);
+      ctx.quadraticCurveTo(0.8, 1.8 - tapSmirk * 0.6, 4.2, -0.4 - tapSmirk * 0.5);
+      ctx.stroke();
+      // Little corner smile dimple
+      ctx.beginPath();
+      ctx.arc(4.4, -0.6 - tapSmirk * 0.5, 1.1, -Math.PI * 0.7, Math.PI * 0.4);
+      ctx.stroke();
+    } else {
+      // Cheerful Open Smile with Coral Tongue (wider when jumping or attacking!)
+      const mouthOpen = !player.onGround ? 6.2 : isAttackingFace ? 5.8 : 5.1 + Math.sin(player.animTime * 16) * 0.5;
+      const wScale = 1 - sideMix * 0.25;
+      ctx.beginPath();
+      ctx.moveTo(-3.8 * wScale, -0.5);
+      ctx.quadraticCurveTo(0, 0.8, 3.8, -0.5);
+      ctx.bezierCurveTo(4.2, mouthOpen, -4.2 * wScale, mouthOpen, -3.8 * wScale, -0.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#F08070';
+      ctx.beginPath();
+      ctx.ellipse(0, mouthOpen * 0.48, 2.3 * (1 - sideMix * 0.2), 1.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
 
     ctx.restore(); // end face group
 
-    // --- 7. Foreground Foreshortened C-Handle on the Side of the Cup in SIDE VIEW (Thinner linework) ---
+    // --- 7. Foreground Foreshortened C-Handle on the Side of the Cup in SIDE VIEW ---
     if (sideMix >= 0.55) {
       ctx.save();
       ctx.translate(-9, -1);
       ctx.fillStyle = '#E8CFB0';
       ctx.strokeStyle = outlineCol;
-      ctx.lineWidth = 2.0;
+      ctx.lineWidth = 1.75;
       ctx.beginPath();
       ctx.roundRect(-4.5, -11.5, 9, 23, 4.5);
       ctx.fill();
@@ -1980,7 +2166,7 @@ export class WorldRenderer {
 
       // Inner handle groove
       ctx.strokeStyle = '#C9AC86';
-      ctx.lineWidth = 1.4;
+      ctx.lineWidth = 1.25;
       ctx.beginPath();
       ctx.moveTo(0, -7);
       ctx.lineTo(0, 7);
@@ -1988,25 +2174,77 @@ export class WorldRenderer {
       ctx.restore();
     }
 
-    // --- 8. Near/Side Arm (Curved at side in SIDE VIEW, or swings the Silver Barista Spoon!) ---
+    ctx.restore(); // end cup body + face group
+    ctx.restore(); // end hipShift group
+
+    // --- 8. Near/Right Arm (In IDLE: Hand resting on right waist/hip! When moving/attacking: swings or slashes!) ---
     ctx.save();
     const spoonUpgraded = unlockedPowerups.has('silver_spoon');
-    const nearArmX = (1 - sideMix) * 21 + sideMix * 2;
-    const nearArmY = (1 - sideMix) * 4 + sideMix * 8 + (player.scaleY - 1) * -3;
+    if (idleBlend > 0.5 && !isAction && player.meleeTimer <= 0) {
+      // Right arm bent akimbo with hand planted firmly on the right waist/hip of the cup!
+      this.drawWaistArm(ctx, 1, tapLift, hipShiftX, hipBobY);
+    } else {
+      const nearArmX = (1 - sideMix) * 21 + sideMix * 2;
+      const nearArmY = (1 - sideMix) * 4 + sideMix * 8 + (player.scaleY - 1) * -3;
 
-    ctx.translate(nearArmX, nearArmY);
-    this.drawProtagonistArm(
-      ctx,
-      1,
-      false,
-      player.meleeTimer > 0,
-      player.meleeTimer,
-      spoonUpgraded,
-      -runSwing * 0.42
-    );
+      ctx.translate(nearArmX, nearArmY);
+      this.drawProtagonistArm(
+        ctx,
+        1,
+        false,
+        player.meleeTimer > 0,
+        player.meleeTimer,
+        spoonUpgraded,
+        -runSwing * 0.42
+      );
+    }
     ctx.restore();
 
     ctx.restore();
+  }
+
+  // Draws an arm bent akimbo with elbow pointing outward and hand resting on the cup's waist/hip!
+  drawWaistArm(ctx, sideDir, tapLift, hipShiftX = 0, hipBobY = 0) {
+    const limbCol = '#522915';
+    const outlineCol = '#3A1B0C';
+
+    const shoulderX = sideDir * 22 + hipShiftX;
+    const shoulderY = 1.5 + hipBobY;
+    const elbowX = sideDir * (31.5 + tapLift * 0.9) + hipShiftX;
+    const elbowY = 6.2 + hipBobY - tapLift * 0.6;
+    const handX = sideDir * 19.5 + hipShiftX;
+    const handY = 12.2 + hipBobY;
+
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Outer dark contour of bent akimbo arm
+    ctx.strokeStyle = outlineCol;
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(shoulderX, shoulderY);
+    ctx.lineTo(elbowX, elbowY);
+    ctx.lineTo(handX, handY);
+    ctx.stroke();
+
+    // Inner warm espresso arm fill stroke
+    ctx.strokeStyle = limbCol;
+    ctx.lineWidth = 2.3;
+    ctx.beginPath();
+    ctx.moveTo(shoulderX, shoulderY);
+    ctx.lineTo(elbowX, elbowY);
+    ctx.lineTo(handX, handY);
+    ctx.stroke();
+
+    // Hand planted on waist/hip
+    ctx.fillStyle = limbCol;
+    ctx.strokeStyle = outlineCol;
+    ctx.lineWidth = 1.15;
+    ctx.beginPath();
+    ctx.ellipse(handX - sideDir * 1.2, handY + 0.4, 3.4, 2.5, sideDir * -0.25, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -2022,7 +2260,7 @@ export class WorldRenderer {
       ctx.rotate(swingAngle);
 
       ctx.strokeStyle = limbCol;
-      ctx.lineWidth = 3.2;
+      ctx.lineWidth = 3.0;
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(0, 0);
@@ -2032,7 +2270,7 @@ export class WorldRenderer {
       // Silver or Golden Barista Spoon
       ctx.fillStyle = spoonUpgraded ? '#fde047' : '#e2e8f0';
       ctx.strokeStyle = '#1e293b';
-      ctx.lineWidth = 1.6;
+      ctx.lineWidth = 1.45;
       ctx.beginPath();
       ctx.roundRect(14, -24, 4, 23, 2);
       ctx.fill();
@@ -2045,7 +2283,7 @@ export class WorldRenderer {
 
       // Slash wave trail
       ctx.strokeStyle = spoonUpgraded ? 'rgba(250, 204, 21, 0.9)' : 'rgba(186, 230, 253, 0.85)';
-      ctx.lineWidth = spoonUpgraded ? 8 : 5.5;
+      ctx.lineWidth = spoonUpgraded ? 7.5 : 5.0;
       ctx.beginPath();
       ctx.arc(0, 0, spoonUpgraded ? 48 : 35, -1.25, 1.15);
       ctx.stroke();
@@ -2054,7 +2292,7 @@ export class WorldRenderer {
       ctx.rotate(walkSwing * 0.38);
 
       ctx.strokeStyle = outlineCol;
-      ctx.lineWidth = 3.8;
+      ctx.lineWidth = 3.5;
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(0, 0);
@@ -2062,7 +2300,7 @@ export class WorldRenderer {
       ctx.stroke();
 
       ctx.strokeStyle = limbCol;
-      ctx.lineWidth = 2.6;
+      ctx.lineWidth = 2.3;
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.quadraticCurveTo(dir * 9, -2, dir * 13, -11);
@@ -2071,7 +2309,7 @@ export class WorldRenderer {
       // Cute spread 4-fingered hand
       ctx.fillStyle = limbCol;
       ctx.strokeStyle = outlineCol;
-      ctx.lineWidth = 1.2;
+      ctx.lineWidth = 1.1;
       ctx.beginPath();
       ctx.arc(dir * 14, -12, 3.4, 0, Math.PI * 2);
       ctx.fill();
@@ -2093,7 +2331,7 @@ export class WorldRenderer {
       ctx.rotate(walkSwing);
 
       ctx.strokeStyle = outlineCol;
-      ctx.lineWidth = 3.8;
+      ctx.lineWidth = 3.5;
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(0, 0);
@@ -2101,7 +2339,7 @@ export class WorldRenderer {
       ctx.stroke();
 
       ctx.strokeStyle = limbCol;
-      ctx.lineWidth = 2.6;
+      ctx.lineWidth = 2.3;
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.quadraticCurveTo(dir * 3, 7, dir * 10, 4);
@@ -2109,7 +2347,7 @@ export class WorldRenderer {
 
       ctx.fillStyle = limbCol;
       ctx.strokeStyle = outlineCol;
-      ctx.lineWidth = 1.2;
+      ctx.lineWidth = 1.1;
       ctx.beginPath();
       ctx.arc(dir * 11, 3.8, 3.0, 0, Math.PI * 2);
       ctx.fill();
@@ -2118,7 +2356,7 @@ export class WorldRenderer {
     ctx.restore();
   }
 
-  drawCupBoot(x, y, angle, toeProfile = 0.5) {
+  drawCupBoot(x, y, angle, toeProfile = 0.5, toeTapAngle = 0) {
     const ctx = this.ctx;
     ctx.save();
     ctx.translate(x, y);
@@ -2131,7 +2369,7 @@ export class WorldRenderer {
 
     // Dark brown stick leg (thinner, refined linework)
     ctx.strokeStyle = outlineCol;
-    ctx.lineWidth = 3.8;
+    ctx.lineWidth = 3.5;
     ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(0, -8);
@@ -2139,17 +2377,24 @@ export class WorldRenderer {
     ctx.stroke();
 
     ctx.strokeStyle = limbCol;
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 2.3;
     ctx.beginPath();
     ctx.moveTo(0, -8);
     ctx.lineTo(0, 2);
     ctx.stroke();
 
+    // Pivot around the back heel (-4.5, 7.5) when tapping the foot in idle!
+    if (Math.abs(toeTapAngle) > 0.001) {
+      ctx.translate(-4.5, 7.5);
+      ctx.rotate(toeTapAngle);
+      ctx.translate(4.5, -7.5);
+    }
+
     // Red Boot Shaft & Rounded Toe (thinner outline)
     const toeExt = 5 + toeProfile * 4.5;
     ctx.fillStyle = bootRed;
     ctx.strokeStyle = outlineCol;
-    ctx.lineWidth = 1.7;
+    ctx.lineWidth = 1.5;
     ctx.lineJoin = 'round';
 
     ctx.beginPath();
