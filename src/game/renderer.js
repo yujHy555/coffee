@@ -9,17 +9,20 @@ export class WorldRenderer {
     this.ctx = ctx;
     this.width = width;
     this.height = height;
-    this.stars = Array.from({ length: 85 }, (_, i) => ({
-      x: (i * 173.7) % 1400,
-      y: (i * 89.3) % 360,
-      r: 0.8 + (i % 3) * 0.9,
-      phase: i * 0.7
+    this.scale = 1;
+    this.stars = Array.from({ length: 110 }, (_, i) => ({
+      x: (i * 173.7) % 1800,
+      y: (i * 71.3) % 330,
+      r: 0.7 + (i % 4) * 0.65,
+      phase: i * 0.7,
+      isCross: i % 11 === 0
     }));
   }
 
-  resize(width, height) {
+  resize(width, height, scale = 1) {
     this.width = width;
     this.height = height;
+    this.scale = scale;
   }
 
   // Smooth blend factor (0 = Zone 1 Night Starry Hills, 1 = Zone 2 Sunset Biscotti Grove)
@@ -42,79 +45,146 @@ export class WorldRenderer {
     const ctx = this.ctx;
     const blend = this.getBiomeBlend(cameraX);
 
-    // Sky gradient
-    const skyGrad = ctx.createLinearGradient(0, 0, 0, this.height);
-    skyGrad.addColorStop(0, this.lerpColor('#192544', '#581c4f', blend));
-    skyGrad.addColorStop(0.45, this.lerpColor('#345278', '#c85250', blend));
-    skyGrad.addColorStop(0.82, this.lerpColor('#7696ab', '#f6aa54', blend));
-    skyGrad.addColorStop(1, this.lerpColor('#c5b299', '#fbd87f', blend));
+    // Rich Painterly Sky Gradient (Matches Reference Image 1 Deep Indigo -> Slate Blue -> Teal-Cyan -> Warm Horizon Glow)
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, this.height * 0.85);
+    skyGrad.addColorStop(0, this.lerpColor('#1b2a4a', '#4a154b', blend));
+    skyGrad.addColorStop(0.32, this.lerpColor('#2c4870', '#9b374e', blend));
+    skyGrad.addColorStop(0.64, this.lerpColor('#5887a8', '#e27347', blend));
+    skyGrad.addColorStop(0.88, this.lerpColor('#9bc2cf', '#f7b257', blend));
+    skyGrad.addColorStop(1, this.lerpColor('#e4d5b7', '#fde08d', blend));
 
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, this.width, this.height);
 
-    // Twinkling stars (strong in Zone 1, subtle dusk sparkles in Zone 2)
-    const starAlpha = 1 - blend * 0.65;
+    // Twinkling Starfield & 4-Point Celestial Sparkles (Reference Image 1)
+    const starAlpha = 1 - blend * 0.6;
     ctx.save();
     this.stars.forEach((s) => {
-      const sx = ((s.x - cameraX * 0.08) % this.width + this.width) % this.width;
-      const twinkle = 0.45 + 0.55 * Math.sin(time * 2.8 + s.phase);
-      ctx.fillStyle = `rgba(255, 250, 225, ${twinkle * starAlpha})`;
+      const sx = ((s.x - cameraX * 0.06) % this.width + this.width) % this.width;
+      const twinkle = 0.4 + 0.6 * Math.sin(time * 2.6 + s.phase);
+      ctx.fillStyle = `rgba(255, 252, 235, ${twinkle * starAlpha})`;
       ctx.beginPath();
       ctx.arc(sx, s.y, s.r, 0, Math.PI * 2);
       ctx.fill();
 
-      if (s.r > 2 && twinkle > 0.8) {
-        ctx.strokeStyle = `rgba(255, 245, 200, ${0.4 * starAlpha})`;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(sx - 5, s.y);
-        ctx.lineTo(sx + 5, s.y);
-        ctx.moveTo(sx, s.y - 5);
-        ctx.lineTo(sx, s.y + 5);
-        ctx.stroke();
+      if (s.isCross && twinkle > 0.65) {
+        this.drawFourPointSparkle(sx, s.y, s.r * 4.2, `rgba(255, 250, 220, ${twinkle * 0.85 * starAlpha})`);
       }
     });
     ctx.restore();
 
-    // Swirled Latte-Art & Night Clouds (Image 1 & Image 2)
+    // Painterly Layered Billowing Clouds with Decorative Spirals (Exact match to Reference Image 1!)
     ctx.save();
-    for (let i = 0; i < 6; i++) {
-      const cx = (((i * 340 - cameraX * 0.14) % (this.width + 320)) + (this.width + 320)) % (this.width + 320) - 160;
-      const cy = 75 + (i % 3) * 48 + Math.sin(time * 0.6 + i) * 6;
-      this.drawLatteCloud(cx, cy, 85 + (i % 2) * 25, blend, time + i);
-    }
+    const cloudConfigs = [
+      { baseX: 160, y: 58, scale: 1.15, flip: 1 },
+      { baseX: 540, y: 82, scale: 1.35, flip: -1 },
+      { baseX: 960, y: 48, scale: 1.05, flip: 1 },
+      { baseX: 1380, y: 92, scale: 1.25, flip: -1 },
+      { baseX: 1760, y: 64, scale: 1.1, flip: 1 }
+    ];
+
+    const span = Math.max(this.width + 450, 1950);
+    cloudConfigs.forEach((cfg, i) => {
+      const cx = (((cfg.baseX - cameraX * 0.12) % span) + span) % span - 220;
+      const cy = cfg.y + Math.sin(time * 0.45 + i) * 4;
+      this.drawReferenceCloudBand(cx, cy, cfg.scale, cfg.flip, blend);
+    });
     ctx.restore();
   }
 
-  drawLatteCloud(x, y, size, blend, phase) {
+  drawFourPointSparkle(x, y, size, color) {
     const ctx = this.ctx;
     ctx.save();
     ctx.translate(x, y);
-
-    // Outer cloud puff
-    ctx.fillStyle = blend < 0.5
-      ? `rgba(145, 175, 205, ${0.22 * (1 - blend) + 0.12})`
-      : `rgba(252, 185, 130, ${0.32 * blend})`;
+    ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.ellipse(0, 0, size, size * 0.36, 0, 0, Math.PI * 2);
-    ctx.ellipse(-size * 0.45, 6, size * 0.55, size * 0.25, 0, 0, Math.PI * 2);
-    ctx.ellipse(size * 0.48, 8, size * 0.5, size * 0.24, 0, 0, Math.PI * 2);
+    ctx.moveTo(0, -size);
+    ctx.quadraticCurveTo(size * 0.14, -size * 0.14, size, 0);
+    ctx.quadraticCurveTo(size * 0.14, size * 0.14, 0, size);
+    ctx.quadraticCurveTo(-size * 0.14, size * 0.14, -size, 0);
+    ctx.quadraticCurveTo(-size * 0.14, -size * 0.14, 0, -size);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  drawReferenceCloudBand(x, y, scale, flip, blend) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale * flip, scale);
+
+    // Colors from Reference Image 1 cloud layers:
+    // Deep blue-slate shadow base, soft periwinkle mid-body, luminous pale-ice upper rim highlight, and inner spiral curls
+    const shadowCol = blend < 0.5
+      ? 'rgba(54, 83, 122, 0.58)'
+      : 'rgba(165, 68, 82, 0.52)';
+    const midCol = blend < 0.5
+      ? 'rgba(98, 136, 174, 0.68)'
+      : 'rgba(232, 126, 98, 0.64)';
+    const highlightCol = blend < 0.5
+      ? 'rgba(168, 202, 228, 0.72)'
+      : 'rgba(254, 202, 152, 0.72)';
+    const curlCol = blend < 0.5
+      ? 'rgba(62, 95, 136, 0.65)'
+      : 'rgba(180, 78, 85, 0.6)';
+
+    // 1. Sweeping diagonal cloud tail & shadow base
+    ctx.fillStyle = shadowCol;
+    ctx.beginPath();
+    ctx.moveTo(-165, 36);
+    ctx.bezierCurveTo(-110, 12, -55, -24, 15, -28);
+    ctx.bezierCurveTo(65, -32, 125, -8, 165, 18);
+    ctx.bezierCurveTo(115, 38, 35, 44, -45, 42);
+    ctx.bezierCurveTo(-105, 40, -145, 42, -165, 36);
+    ctx.closePath();
     ctx.fill();
 
-    // Latte Rosetta / Heart swirl inside cloud (from Image 2 sky!)
-    if (blend > 0.15) {
-      ctx.strokeStyle = `rgba(255, 238, 210, ${0.38 * blend})`;
-      ctx.lineWidth = 2.2;
+    // 2. Sculpted billowing cloud puffs (Midtone body)
+    ctx.fillStyle = midCol;
+    ctx.beginPath();
+    ctx.moveTo(-145, 30);
+    ctx.bezierCurveTo(-125, 4, -90, 2, -72, 12);
+    ctx.bezierCurveTo(-58, -18, -12, -26, 12, -4);
+    ctx.bezierCurveTo(32, -24, 78, -20, 92, 4);
+    ctx.bezierCurveTo(115, -4, 145, 6, 155, 22);
+    ctx.quadraticCurveTo(60, 36, -35, 34);
+    ctx.quadraticCurveTo(-100, 35, -145, 30);
+    ctx.closePath();
+    ctx.fill();
+
+    // 3. Crisp luminous top rim highlight along each puff crest (Reference Image 1 signature look!)
+    ctx.strokeStyle = highlightCol;
+    ctx.lineWidth = 3.2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-132, 20);
+    ctx.bezierCurveTo(-115, 2, -88, 2, -72, 12);
+    ctx.moveTo(-64, 6);
+    ctx.bezierCurveTo(-48, -16, -12, -22, 10, -4);
+    ctx.moveTo(18, -6);
+    ctx.bezierCurveTo(36, -20, 72, -16, 86, 2);
+    ctx.stroke();
+
+    // 4. Stylized Decorative Swirl Curls inside the cloud body (Exact detail from Reference Image 1!)
+    ctx.strokeStyle = curlCol;
+    ctx.lineWidth = 2.6;
+    const drawCloudSpiral = (sx, sy, rMax) => {
       ctx.beginPath();
-      for (let t = 0; t < Math.PI * 3.5; t += 0.2) {
-        const r = (t / (Math.PI * 3.5)) * (size * 0.42);
-        const px = Math.cos(t + phase * 0.2) * r * 1.4;
-        const py = Math.sin(t + phase * 0.2) * r * 0.55;
-        if (t === 0) ctx.moveTo(px, py);
+      for (let a = 0; a <= Math.PI * 2.7; a += 0.22) {
+        const r = rMax * (1 - a / (Math.PI * 3.1));
+        const px = sx + Math.cos(a) * r * 1.25;
+        const py = sy + Math.sin(a) * r;
+        if (a === 0) ctx.moveTo(px, py);
         else ctx.lineTo(px, py);
       }
       ctx.stroke();
-    }
+    };
+
+    drawCloudSpiral(-18, 12, 15);
+    drawCloudSpiral(48, 15, 12);
+    drawCloudSpiral(-82, 21, 9);
+
     ctx.restore();
   }
 
@@ -122,14 +192,28 @@ export class WorldRenderer {
     const ctx = this.ctx;
     const blend = this.getBiomeBlend(cameraX);
 
-    // Far Layer: Giant Espresso Machines, Vintage Burr Grinders, and Roastery Silhouettes (from both images!)
+    // Distant hazy roastery skyline silhouettes (Moka pots, silos, portafilter towers in mist as seen in Image 1 center horizon)
+    ctx.save();
+    ctx.fillStyle = this.lerpColor('#5c7e9e', '#9e584c', blend);
+    ctx.globalAlpha = 0.45;
+    for (let i = 0; i < 12; i++) {
+      const hx = ((i * 310 - cameraX * 0.2) % (this.width + 400) + (this.width + 400)) % (this.width + 400) - 200;
+      const hHeight = 70 + (i % 3) * 32;
+      ctx.beginPath();
+      ctx.roundRect(hx, 390 - hHeight, 38 + (i % 2) * 18, hHeight + 60, 8);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Far Layer: Detailed Pastel-Lilac Espresso Machines & Clear-Hopper Burr Grinders (Reference Image 1 left & right!)
     ctx.save();
     const machinePositions = [
-      { worldX: 320, type: 'espresso_machine' },
+      { worldX: 310, type: 'espresso_machine' },
       { worldX: 980, type: 'burr_grinder' },
-      { worldX: 1580, type: 'french_press' },
-      { worldX: 2220, type: 'espresso_machine' },
-      { worldX: 2890, type: 'burr_grinder' },
+      { worldX: 1120, type: 'drip_brewer' },
+      { worldX: 1680, type: 'espresso_machine' },
+      { worldX: 2320, type: 'burr_grinder' },
+      { worldX: 2940, type: 'drip_brewer' },
       { worldX: 3650, type: 'vintage_mill' },
       { worldX: 4520, type: 'espresso_machine' },
       { worldX: 5380, type: 'vintage_mill' },
@@ -139,48 +223,103 @@ export class WorldRenderer {
     machinePositions.forEach((m) => {
       const screenX = m.worldX - cameraX * 0.42;
       if (screenX < -260 || screenX > this.width + 260) return;
-      this.drawDistantCoffeeMonument(screenX, 395, m.type, blend, time);
+      this.drawDistantCoffeeMonument(screenX, 412, m.type, blend, time);
     });
     ctx.restore();
 
-    // Mid-Layer Rolling Coffee Bean Hills
+    // Mid-Layer Rolling Roasted Coffee Hills with Embedded Whole Coffee Beans (Reference Image 1!)
     ctx.save();
-    const hillColorBack = this.lerpColor('#4a2c1d', '#5c2c23', blend);
-    const hillColorFront = this.lerpColor('#633921', '#783926', blend);
+    const hillColorBack = this.lerpColor('#5a3422', '#683126', blend);
+    const hillColorFront = this.lerpColor('#764226', '#873e29', blend);
+    const hillRimLight = this.lerpColor('#a86840', '#c46c45', blend);
 
     // Back hills
     ctx.fillStyle = hillColorBack;
+    ctx.strokeStyle = '#2d150a';
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(0, this.height);
-    for (let x = 0; x <= this.width + 40; x += 40) {
+    ctx.moveTo(-20, this.height);
+    for (let x = -20; x <= this.width + 40; x += 32) {
       const worldX = x + cameraX * 0.35;
-      const y = 415 + Math.sin(worldX * 0.0032) * 58 + Math.cos(worldX * 0.007) * 24;
+      const y = 415 + Math.sin(worldX * 0.0032) * 56 + Math.cos(worldX * 0.007) * 22;
       ctx.lineTo(x, y);
     }
-    ctx.lineTo(this.width, this.height);
+    ctx.lineTo(this.width + 40, this.height);
     ctx.closePath();
     ctx.fill();
+    ctx.stroke();
 
-    // Foreground roasted bean hills with embedded bean textures
+    // Foreground roasted soil hills
     ctx.fillStyle = hillColorFront;
     ctx.beginPath();
-    ctx.moveTo(0, this.height);
-    for (let x = 0; x <= this.width + 40; x += 40) {
+    ctx.moveTo(-20, this.height);
+    for (let x = -20; x <= this.width + 40; x += 28) {
       const worldX = x + cameraX * 0.55;
-      const y = 465 + Math.sin(worldX * 0.0045 + 1.2) * 48 + Math.cos(worldX * 0.009) * 18;
+      const y = 462 + Math.sin(worldX * 0.0045 + 1.2) * 46 + Math.cos(worldX * 0.009) * 16;
       ctx.lineTo(x, y);
     }
-    ctx.lineTo(this.width, this.height);
+    ctx.lineTo(this.width + 40, this.height);
     ctx.closePath();
     ctx.fill();
 
+    // Warm rim highlight along the crest of the foreground hills
+    ctx.strokeStyle = hillRimLight;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    for (let x = -20; x <= this.width + 40; x += 28) {
+      const worldX = x + cameraX * 0.55;
+      const y = 462 + Math.sin(worldX * 0.0045 + 1.2) * 46 + Math.cos(worldX * 0.009) * 16;
+      if (x === -20) ctx.moveTo(x, y + 2);
+      else ctx.lineTo(x, y + 2);
+    }
+    ctx.stroke();
+
+    // Dark outline along foreground hill crest
+    ctx.strokeStyle = '#33170a';
+    ctx.lineWidth = 2.8;
+    ctx.beginPath();
+    for (let x = -20; x <= this.width + 40; x += 28) {
+      const worldX = x + cameraX * 0.55;
+      const y = 462 + Math.sin(worldX * 0.0045 + 1.2) * 46 + Math.cos(worldX * 0.009) * 16;
+      if (x === -20) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Embedded Roasted Coffee Beans scattered inside the hills (Reference Image 1 texture!)
+    const firstBeanIdx = Math.floor((cameraX * 0.55) / 65) - 2;
+    const lastBeanIdx = firstBeanIdx + Math.ceil(this.width / 65) + 5;
+    for (let bi = firstBeanIdx; bi <= lastBeanIdx; bi++) {
+      const worldX = bi * 65 + ((bi * 37) % 25);
+      const sx = worldX - cameraX * 0.55;
+      const hillTopY = 462 + Math.sin(worldX * 0.0045 + 1.2) * 46 + Math.cos(worldX * 0.009) * 16;
+      const by = hillTopY + 18 + ((Math.abs(bi) * 29) % 45);
+      const angle = ((bi * 1.3) % 3.14) - 1.5;
+
+      ctx.save();
+      ctx.translate(sx, by);
+      ctx.rotate(angle);
+      ctx.fillStyle = '#542a14';
+      ctx.strokeStyle = '#2d1408';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 12, 7.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-8, 0);
+      ctx.quadraticCurveTo(0, 3, 8, 0);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Golden Leaf Magical Coffee Plants (Zone 1 Image 1 left side) & Glowing Coffee Cherry Trees (Zone 2 Image 2)
-    const floraWorldX = [140, 620, 1380, 1920, 2720, 3450, 4180, 5120, 5890, 6680];
+    const floraWorldX = [125, 610, 1380, 1920, 2720, 3450, 4180, 5120, 5890, 6680];
     floraWorldX.forEach((wx, idx) => {
       const sx = wx - cameraX * 0.75;
-      if (sx < -200 || sx > this.width + 200) return;
+      if (sx < -220 || sx > this.width + 220) return;
       if (wx < 3250) {
-        this.drawGoldenCoffeePlant(sx, 475, time, idx);
+        this.drawGoldenCoffeePlant(sx, 480, time, idx);
       } else {
         this.drawCoffeeCherryTree(sx, 480, time, idx);
       }
@@ -194,73 +333,125 @@ export class WorldRenderer {
     ctx.save();
     ctx.translate(x, baseY);
 
-    const silhouetteFill = this.lerpColor('#526e8a', '#8c5347', blend);
-    const highlightFill = this.lerpColor('#7695b3', '#b8765c', blend);
-    const trimColor = this.lerpColor('#394f66', '#61352d', blend);
+    // Pastel lavender-grey & slate-blue tones matching Reference Image 1's background espresso machine & grinders
+    const bodyFill = this.lerpColor('#8c92b5', '#9e6356', blend);
+    const panelFill = this.lerpColor('#6c769c', '#7a463b', blend);
+    const highlightFill = this.lerpColor('#b0b7d6', '#c48674', blend);
+    const trimColor = this.lerpColor('#3f4868', '#4f2922', blend);
 
-    ctx.fillStyle = silhouetteFill;
+    ctx.fillStyle = bodyFill;
     ctx.strokeStyle = trimColor;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 2.8;
 
     if (type === 'espresso_machine') {
-      // Classic café espresso machine silhouette (from Image 1 left & Image 2 right)
+      // 3/4 Perspective Café Espresso Machine with cup on drip tray (Exact match to Image 1 left background!)
       ctx.beginPath();
-      ctx.roundRect(-58, -155, 116, 155, 14);
+      ctx.roundRect(-56, -162, 112, 162, 14);
       ctx.fill();
       ctx.stroke();
 
-      // Upper cup warmer crown
+      // Recessed inner brewing alcove
+      ctx.fillStyle = panelFill;
+      ctx.beginPath();
+      ctx.roundRect(-42, -110, 84, 88, 8);
+      ctx.fill();
+      ctx.stroke();
+
+      // Upper control header with pressure gauge & buttons
       ctx.fillStyle = highlightFill;
       ctx.beginPath();
-      ctx.roundRect(-64, -172, 128, 24, 8);
+      ctx.roundRect(-60, -168, 120, 48, 12);
+      ctx.fill();
+      ctx.stroke();
+
+      // White Cup resting on top warmer
+      ctx.fillStyle = '#d8e2ef';
+      ctx.beginPath();
+      ctx.roundRect(-36, -188, 28, 20, [2, 2, 10, 10]);
       ctx.fill();
       ctx.stroke();
 
       // Pressure gauge dial
-      ctx.fillStyle = '#fff5d6';
+      ctx.fillStyle = '#eef2ff';
       ctx.beginPath();
-      ctx.arc(0, -125, 16, 0, Math.PI * 2);
+      ctx.arc(4, -144, 13, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
       // Gauge needle
-      ctx.strokeStyle = '#d946ef';
+      ctx.strokeStyle = '#ef4444';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(0, -125);
-      ctx.lineTo(Math.cos(time * 2) * 10, -125 + Math.sin(time * 2) * 10);
+      ctx.moveTo(4, -144);
+      ctx.lineTo(4 + Math.cos(time * 2) * 8, -144 + Math.sin(time * 2) * 8);
       ctx.stroke();
 
-      // Portafilter handle sticking out
+      // Grouphead & Portafilter Handle extending right
+      ctx.fillStyle = trimColor;
+      ctx.fillRect(-16, -110, 32, 16);
       ctx.strokeStyle = trimColor;
-      ctx.lineWidth = 8;
+      ctx.lineWidth = 7;
+      ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(0, -82);
-      ctx.lineTo(68, -74);
+      ctx.moveTo(8, -98);
+      ctx.lineTo(66, -88);
       ctx.stroke();
-    } else if (type === 'burr_grinder') {
-      // Glass hopper burr grinder (from Image 1 right side)
+
+      // White Cup sitting on the drip tray underneath portafilter
+      ctx.fillStyle = '#d8e2ef';
+      ctx.lineWidth = 2.4;
       ctx.beginPath();
-      ctx.roundRect(-38, -110, 76, 110, 8);
+      ctx.roundRect(-18, -56, 36, 32, [3, 3, 14, 14]);
+      ctx.fill();
+      ctx.stroke();
+    } else if (type === 'burr_grinder' || type === 'drip_brewer') {
+      // Clear Glass Hopper Burr Grinder filled with whole coffee beans (Exact match to Image 1 right background!)
+      ctx.fillStyle = bodyFill;
+      ctx.beginPath();
+      ctx.roundRect(-40, -115, 80, 115, 8);
       ctx.fill();
       ctx.stroke();
 
-      // Clear glass bean hopper on top
-      ctx.fillStyle = 'rgba(220, 242, 255, 0.35)';
+      // Grinder collar
+      ctx.fillStyle = panelFill;
+      ctx.fillRect(-32, -130, 64, 16);
+      ctx.strokeRect(-32, -130, 64, 16);
+
+      // Transparent blue-tinted glass bean hopper on top
+      ctx.fillStyle = 'rgba(186, 224, 248, 0.36)';
       ctx.beginPath();
-      ctx.moveTo(-46, -185);
-      ctx.lineTo(46, -185);
-      ctx.lineTo(30, -110);
-      ctx.lineTo(-30, -110);
+      ctx.moveTo(-48, -205);
+      ctx.lineTo(48, -205);
+      ctx.lineTo(32, -130);
+      ctx.lineTo(-32, -130);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
-      // Mound of beans inside hopper
-      ctx.fillStyle = '#5c341d';
+      // Pile of dark-roasted coffee beans inside the glass hopper!
+      ctx.fillStyle = '#633c28';
       ctx.beginPath();
-      ctx.arc(0, -135, 28, Math.PI, 0);
+      ctx.moveTo(-38, -162);
+      ctx.quadraticCurveTo(0, -182, 38, -160);
+      ctx.lineTo(30, -130);
+      ctx.lineTo(-30, -130);
+      ctx.closePath();
       ctx.fill();
+
+      // Individual bean texture dots in hopper
+      ctx.fillStyle = '#472818';
+      for (let bx = -24; bx <= 24; bx += 12) {
+        ctx.beginPath();
+        ctx.ellipse(bx, -148 - (Math.abs(bx) % 9), 5, 3.5, 0.3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Hopper lid
+      ctx.fillStyle = highlightFill;
+      ctx.beginPath();
+      ctx.ellipse(0, -205, 50, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
     } else {
       // Vintage hand-crank coffee mill (from Image 2 left background)
       ctx.beginPath();
@@ -268,14 +459,12 @@ export class WorldRenderer {
       ctx.fill();
       ctx.stroke();
 
-      // Bowl top
       ctx.fillStyle = highlightFill;
       ctx.beginPath();
       ctx.arc(0, -105, 44, Math.PI, 0, true);
       ctx.fill();
       ctx.stroke();
 
-      // S-curved crank arm
       ctx.lineWidth = 5;
       ctx.beginPath();
       ctx.moveTo(0, -135);
@@ -290,57 +479,99 @@ export class WorldRenderer {
     const ctx = this.ctx;
     ctx.save();
     ctx.translate(x, y);
-    const sway = Math.sin(time * 1.8 + seed) * 0.06;
+    const sway = Math.sin(time * 1.7 + seed) * 0.045;
     ctx.rotate(sway);
 
-    // Stem
-    ctx.strokeStyle = '#85582a';
-    ctx.lineWidth = 6;
+    // Warm golden ambient backlight aura behind the plant (Reference Image 1 left!)
+    const plantGlow = ctx.createRadialGradient(0, -110, 10, 0, -110, 125);
+    plantGlow.addColorStop(0, 'rgba(254, 240, 138, 0.42)');
+    plantGlow.addColorStop(0.55, 'rgba(245, 158, 11, 0.14)');
+    plantGlow.addColorStop(1, 'rgba(245, 158, 11, 0)');
+    ctx.fillStyle = plantGlow;
+    ctx.beginPath();
+    ctx.arc(0, -110, 125, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Main curved stem & secondary sprout stem
+    ctx.strokeStyle = '#653b16';
+    ctx.lineWidth = 6.5;
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.quadraticCurveTo(-12, -80, 4, -165);
+    ctx.moveTo(0, 8);
+    ctx.quadraticCurveTo(-18, -95, 6, -210);
     ctx.stroke();
 
-    // Glowing golden leaves (Image 1 left foreground)
+    // Coffee beans growing at the leaf nodes (as seen in Reference Image 1!)
+    const nodeBeans = [
+      { x: -11, y: -62, rot: -0.4 },
+      { x: -8, y: -115, rot: 0.35 }
+    ];
+    nodeBeans.forEach((nb) => {
+      ctx.save();
+      ctx.translate(nb.x, nb.y);
+      ctx.rotate(nb.rot);
+      ctx.fillStyle = '#92400e';
+      ctx.strokeStyle = '#3b1505';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 7, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    });
+
+    // Translucent, luminous golden leaves with veined details
     const leaves = [
-      { y: -45, dir: -1, scale: 1.0 },
-      { y: -75, dir: 1, scale: 1.05 },
-      { y: -110, dir: -1, scale: 0.9 },
-      { y: -135, dir: 1, scale: 0.8 },
-      { y: -165, dir: 0, scale: 0.75 }
+      { x: -6, y: -55, dir: -1.1, scale: 1.15 },
+      { x: -8, y: -85, dir: 0.95, scale: 1.2 },
+      { x: -9, y: -130, dir: -0.95, scale: 1.05 },
+      { x: -4, y: -162, dir: 0.88, scale: 0.98 },
+      { x: 2, y: -195, dir: -0.45, scale: 0.82 },
+      { x: 6, y: -205, dir: 0.38, scale: 0.78 }
     ];
 
     leaves.forEach((lf, i) => {
       ctx.save();
-      ctx.translate(0, lf.y);
-      ctx.rotate(lf.dir * 0.55 + Math.sin(time * 2.2 + i) * 0.05);
+      ctx.translate(lf.x, lf.y);
+      ctx.rotate(lf.dir + Math.sin(time * 2.1 + i) * 0.04);
       ctx.scale(lf.scale, lf.scale);
 
-      const grad = ctx.createLinearGradient(0, 0, 0, -48);
-      grad.addColorStop(0, '#d97706');
-      grad.addColorStop(0.5, '#fbbf24');
-      grad.addColorStop(1, '#fef08a');
+      const grad = ctx.createLinearGradient(0, 0, 0, -58);
+      grad.addColorStop(0, '#b45309');
+      grad.addColorStop(0.35, '#f59e0b');
+      grad.addColorStop(0.75, '#fde047');
+      grad.addColorStop(1, '#fef9c3');
 
       ctx.fillStyle = grad;
-      ctx.strokeStyle = '#78350f';
-      ctx.lineWidth = 2.2;
+      ctx.strokeStyle = '#5c2808';
+      ctx.lineWidth = 2.4;
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.quadraticCurveTo(-22, -24, 0, -52);
-      ctx.quadraticCurveTo(22, -24, 0, 0);
+      ctx.bezierCurveTo(-24, -18, -20, -44, 0, -60);
+      ctx.bezierCurveTo(20, -44, 24, -18, 0, 0);
       ctx.fill();
       ctx.stroke();
 
-      // Leaf center vein
-      ctx.strokeStyle = '#fef9c3';
-      ctx.lineWidth = 1.3;
+      // Glowing leaf center rib & side veins
+      ctx.strokeStyle = '#fef08a';
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
       ctx.moveTo(0, -4);
-      ctx.lineTo(0, -44);
+      ctx.lineTo(0, -52);
+      ctx.moveTo(0, -18);
+      ctx.lineTo(-9, -28);
+      ctx.moveTo(0, -28);
+      ctx.lineTo(9, -38);
       ctx.stroke();
       ctx.restore();
     });
+
+    // Floating 4-point golden sparkles around the plant
+    for (let s = 0; s < 4; s++) {
+      const spX = -45 + s * 32 + Math.sin(time * 2 + s) * 6;
+      const spY = -65 - s * 38 + Math.cos(time * 2.5 + s) * 5;
+      this.drawFourPointSparkle(spX, spY, 6 + (s % 2) * 3, '#fef08a');
+    }
 
     ctx.restore();
   }
@@ -394,7 +625,6 @@ export class WorldRenderer {
       ctx.fill();
       ctx.stroke();
 
-      // Inner warm glow
       ctx.fillStyle = '#fde047';
       ctx.beginPath();
       ctx.arc(ch.cx - 2, ch.cy - 2, 2.5, 0, Math.PI * 2);
@@ -406,121 +636,225 @@ export class WorldRenderer {
 
   drawPlatform(p, cameraX, time) {
     const sx = p.x - cameraX;
-    if (sx + p.w < -80 || sx > this.width + 80) return;
+    if (sx + p.w < -100 || sx > this.width + 100) return;
 
     const ctx = this.ctx;
     ctx.save();
     ctx.translate(sx, p.y);
 
     if (p.type === 'biscuit') {
-      // Golden scalloped tea biscuit platform with cream filling (Image 1)
-      // Roasted coffee beans supporting underneath
-      ctx.fillStyle = '#4a2511';
-      for (let bx = 18; bx < p.w - 14; bx += 36) {
+      // Ornate Scalloped Butter-Biscuit Sandwich Platform resting on Giant Roasted Beans (Reference Image 1!)
+      // 1. Underlying Roasted Coffee Bean Foundation
+      for (let bx = 26; bx < p.w - 18; bx += 48) {
+        ctx.save();
+        ctx.translate(bx, p.h + 14);
+        ctx.rotate((bx % 2 === 0 ? 1 : -1) * 0.18);
+        const bGrad = ctx.createRadialGradient(-4, -4, 2, 0, 0, 26);
+        bGrad.addColorStop(0, '#7c3f1d');
+        bGrad.addColorStop(1, '#381908');
+        ctx.fillStyle = bGrad;
+        ctx.strokeStyle = '#1f0c03';
+        ctx.lineWidth = 2.6;
         ctx.beginPath();
-        ctx.ellipse(bx, p.h + 6, 18, 12, 0.2, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, 24, 16, 0, 0, Math.PI * 2);
         ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-16, 0);
+        ctx.quadraticCurveTo(0, 5, 16, 0);
+        ctx.stroke();
+        ctx.restore();
       }
 
-      // Cream filling layer
-      ctx.fillStyle = '#fffbeb';
-      ctx.fillRect(6, p.h * 0.48, p.w - 12, p.h * 0.28);
+      // 2. Bottom Biscuit Layer
+      ctx.fillStyle = '#c26d1f';
+      ctx.strokeStyle = '#3b1704';
+      ctx.lineWidth = 2.8;
+      ctx.beginPath();
+      ctx.roundRect(2, p.h * 0.62, p.w - 4, p.h * 0.38, 9);
+      ctx.fill();
+      ctx.stroke();
 
-      // Top & bottom biscuit wafers
-      const biscuitGrad = ctx.createLinearGradient(0, 0, 0, p.h);
-      biscuitGrad.addColorStop(0, '#f59e0b');
-      biscuitGrad.addColorStop(0.5, '#d97706');
+      // 3. Vanilla Cream Filling Wave
+      ctx.fillStyle = '#fff9db';
+      ctx.strokeStyle = '#5c2808';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(5, p.h * 0.44, p.w - 10, p.h * 0.26, 6);
+      ctx.fill();
+      ctx.stroke();
+
+      // 4. Top Golden Scalloped Biscuit Layer
+      const biscuitGrad = ctx.createLinearGradient(0, 0, 0, p.h * 0.56);
+      biscuitGrad.addColorStop(0, '#fde08d');
+      biscuitGrad.addColorStop(0.35, '#f59e0b');
       biscuitGrad.addColorStop(1, '#b45309');
 
       ctx.fillStyle = biscuitGrad;
-      ctx.strokeStyle = '#451a03';
+      ctx.strokeStyle = '#3b1704';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.roundRect(0, 0, p.w, p.h * 0.56, 10);
+      ctx.roundRect(0, 0, p.w, p.h * 0.54, 11);
       ctx.fill();
       ctx.stroke();
 
+      // Scalloped bottom edge bumps & decorative baker's pinholes along top wafer
+      ctx.strokeStyle = '#78350f';
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.roundRect(2, p.h * 0.68, p.w - 4, p.h * 0.34, 8);
-      ctx.fill();
+      ctx.roundRect(8, 4, p.w - 16, p.h * 0.34, 6);
       ctx.stroke();
 
-      // Scalloped dock dots on top biscuit
-      ctx.fillStyle = '#92400e';
-      for (let dx = 18; dx < p.w - 12; dx += 22) {
+      ctx.fillStyle = '#78350f';
+      for (let dx = 20; dx < p.w - 16; dx += 20) {
         ctx.beginPath();
-        ctx.arc(dx, p.h * 0.28, 2.5, 0, Math.PI * 2);
+        ctx.arc(dx, p.h * 0.21, 2.2, 0, Math.PI * 2);
         ctx.fill();
       }
     } else if (p.type === 'mossy_bean') {
-      // Giant Roasted Coffee Bean Boulder topped with lush green moss (Image 1 left centerpiece!)
-      const beanGrad = ctx.createRadialGradient(p.w * 0.4, p.h * 0.35, 10, p.w * 0.5, p.h * 0.5, p.w * 0.65);
-      beanGrad.addColorStop(0, '#7c3f1c');
-      beanGrad.addColorStop(0.6, '#4d2611');
-      beanGrad.addColorStop(1, '#291307');
+      // Iconic Stacked Giant Coffee Bean Boulders with Velvety Green Moss Patches (Reference Image 1 left centerpiece!)
+      // 1. Two Supporting Lower Giant Coffee Beans underneath the main boulder
+      const drawLowerBean = (bx, by, rx, ry, rot) => {
+        ctx.save();
+        ctx.translate(bx, by);
+        ctx.rotate(rot);
+        const g = ctx.createRadialGradient(-rx * 0.25, -ry * 0.25, 6, 0, 0, rx);
+        g.addColorStop(0, '#8a4824');
+        g.addColorStop(0.65, '#542811');
+        g.addColorStop(1, '#2a1206');
+        ctx.fillStyle = g;
+        ctx.strokeStyle = '#1b0a03';
+        ctx.lineWidth = 3.4;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Deep roasted crease
+        ctx.strokeStyle = '#160702';
+        ctx.lineWidth = 4.5;
+        ctx.beginPath();
+        ctx.moveTo(-rx * 0.78, -4);
+        ctx.bezierCurveTo(-rx * 0.2, ry * 0.28, rx * 0.2, -ry * 0.28, rx * 0.78, 4);
+        ctx.stroke();
+        ctx.restore();
+      };
+
+      drawLowerBean(p.w * 0.34, p.h * 0.92, p.w * 0.31, p.h * 0.34, 0.32);
+      drawLowerBean(p.w * 0.68, p.h * 0.88, p.w * 0.29, p.h * 0.32, -0.28);
+
+      // 2. Main Top Giant Coffee Bean Boulder
+      const beanGrad = ctx.createRadialGradient(p.w * 0.38, p.h * 0.28, 12, p.w * 0.5, p.h * 0.45, p.w * 0.58);
+      beanGrad.addColorStop(0, '#9a5229');
+      beanGrad.addColorStop(0.55, '#5c2d14');
+      beanGrad.addColorStop(1, '#2d1407');
 
       ctx.fillStyle = beanGrad;
-      ctx.strokeStyle = '#1c0b03';
-      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = '#1b0a03';
+      ctx.lineWidth = 3.8;
       ctx.beginPath();
-      ctx.ellipse(p.w / 2, p.h / 2, p.w / 2, p.h / 2, 0, 0, Math.PI * 2);
+      ctx.ellipse(p.w / 2, p.h * 0.42, p.w * 0.52, p.h * 0.44, -0.04, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
-      // Coffee bean center crease
-      ctx.strokeStyle = '#1f0d05';
-      ctx.lineWidth = 5;
+      // Deep central roasted bean cleft
+      ctx.strokeStyle = '#1b0a03';
+      ctx.lineWidth = 5.5;
       ctx.beginPath();
-      ctx.moveTo(14, p.h * 0.52);
-      ctx.bezierCurveTo(p.w * 0.35, p.h * 0.36, p.w * 0.65, p.h * 0.66, p.w - 14, p.h * 0.45);
+      ctx.moveTo(10, p.h * 0.38);
+      ctx.bezierCurveTo(p.w * 0.35, p.h * 0.22, p.w * 0.65, p.h * 0.54, p.w - 10, p.h * 0.32);
       ctx.stroke();
 
-      // Velvety green moss cap on top of the giant bean
-      ctx.fillStyle = '#65a30d';
-      ctx.strokeStyle = '#365314';
-      ctx.lineWidth = 2.5;
+      // 3. Organic, multi-toned velvety green moss patches draped over the boulder (Reference Image 1!)
+      const mossGrad = ctx.createLinearGradient(0, 0, 0, p.h * 0.6);
+      mossGrad.addColorStop(0, '#84cc16');
+      mossGrad.addColorStop(0.6, '#65a30d');
+      mossGrad.addColorStop(1, '#3f6212');
+
+      ctx.fillStyle = mossGrad;
+      ctx.strokeStyle = '#283e0b';
+      ctx.lineWidth = 2.4;
+
+      // Top-left & rim moss blanket
       ctx.beginPath();
-      ctx.moveTo(16, p.h * 0.36);
-      ctx.quadraticCurveTo(p.w * 0.5, -10, p.w - 16, p.h * 0.36);
-      ctx.quadraticCurveTo(p.w * 0.75, p.h * 0.52, p.w * 0.5, p.h * 0.34);
-      ctx.quadraticCurveTo(p.w * 0.25, p.h * 0.5, 16, p.h * 0.36);
+      ctx.moveTo(18, p.h * 0.28);
+      ctx.quadraticCurveTo(p.w * 0.48, -10, p.w - 18, p.h * 0.24);
+      ctx.bezierCurveTo(p.w * 0.96, p.h * 0.48, p.w * 0.78, p.h * 0.62, p.w * 0.66, p.h * 0.48);
+      ctx.quadraticCurveTo(p.w * 0.52, p.h * 0.3, p.w * 0.38, p.h * 0.26);
+      ctx.quadraticCurveTo(p.w * 0.22, p.h * 0.24, 18, p.h * 0.28);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Left lower moss patch
+      ctx.beginPath();
+      ctx.moveTo(16, p.h * 0.46);
+      ctx.quadraticCurveTo(p.w * 0.22, p.h * 0.38, p.w * 0.34, p.h * 0.52);
+      ctx.quadraticCurveTo(p.w * 0.2, p.h * 0.64, 16, p.h * 0.46);
+      ctx.closePath();
       ctx.fill();
       ctx.stroke();
     } else if (p.type === 'sugar_cube') {
-      // Sparkling Crystalline Sugar Cube (Image 1 & Image 2 floating stepping stones)
-      const bob = Math.sin(time * 3.2 + p.x * 0.02) * 4;
-      ctx.translate(0, bob);
+      // Crystalline 3-Faceted Sparkling Sugar Cube (Exact match to Reference Image 1 arch!)
+      const bob = Math.sin(time * 3.2 + p.x * 0.025) * 4;
+      const tilt = ((p.x % 200) - 100) * 0.0012;
+      ctx.translate(p.w / 2, p.h / 2 + bob);
+      ctx.rotate(tilt);
+      ctx.translate(-p.w / 2, -p.h / 2);
 
-      // Outer crystal glow
-      ctx.shadowColor = 'rgba(186, 230, 253, 0.75)';
-      ctx.shadowBlur = 14;
+      // Soft icy-blue outer glow
+      ctx.shadowColor = 'rgba(186, 230, 253, 0.85)';
+      ctx.shadowBlur = 16;
 
-      // 3D isometric sugar cube faces
-      ctx.fillStyle = '#f8fafc';
-      ctx.strokeStyle = '#64748b';
-      ctx.lineWidth = 2.5;
+      const w = p.w;
+      const h = p.h;
+
+      // Top isometric diamond/rhombus face (brightest white)
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 2;
+      ctx.lineJoin = 'round';
       ctx.beginPath();
-      ctx.roundRect(0, 6, p.w, p.h - 6, 8);
+      ctx.moveTo(8, 0);
+      ctx.lineTo(w - 2, 0);
+      ctx.lineTo(w - 8, 12);
+      ctx.lineTo(2, 12);
+      ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
-      // Top perspective face
-      ctx.fillStyle = '#ffffff';
+      // Front main crystal face (cool ice-white gradient)
+      const frontGrad = ctx.createLinearGradient(0, 12, w, h);
+      frontGrad.addColorStop(0, '#f8fafc');
+      frontGrad.addColorStop(1, '#dbeafe');
+      ctx.fillStyle = frontGrad;
       ctx.beginPath();
-      ctx.moveTo(4, 6);
-      ctx.lineTo(12, 0);
-      ctx.lineTo(p.w - 4, 0);
-      ctx.lineTo(p.w - 2, 6);
+      ctx.moveTo(2, 12);
+      ctx.lineTo(w - 8, 12);
+      ctx.lineTo(w - 8, h);
+      ctx.lineTo(2, h);
       ctx.closePath();
       ctx.fill();
+      ctx.stroke();
 
-      // Shimmering sugar crystals
+      // Right side shaded face (deeper periwinkle-ice)
+      ctx.fillStyle = '#bfdbfe';
+      ctx.beginPath();
+      ctx.moveTo(w - 8, 12);
+      ctx.lineTo(w - 2, 0);
+      ctx.lineTo(w - 2, h - 10);
+      ctx.lineTo(w - 8, h);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Granular sugar crystal glints inside front face
       ctx.shadowBlur = 0;
-      ctx.fillStyle = '#bae6fd';
-      for (let i = 0; i < 6; i++) {
-        const cx = 10 + ((i * 17) % (p.w - 18));
-        const cy = 14 + ((i * 13) % (p.h - 22));
-        ctx.fillRect(cx, cy, 3, 3);
+      for (let i = 0; i < 14; i++) {
+        const cx = 7 + ((i * 19) % (w - 20));
+        const cy = 16 + ((i * 13) % (h - 22));
+        ctx.fillStyle = i % 2 === 0 ? '#ffffff' : '#93c5fd';
+        ctx.fillRect(cx, cy, 2.5, 2.5);
       }
     } else if (p.type === 'biscotti') {
       // Crunchy Almond Biscotti Slice floating over crema (Image 2 left & center)
@@ -542,7 +876,6 @@ export class WorldRenderer {
       ctx.fill();
       ctx.stroke();
 
-      // Toasted almond chunks inside biscotti cut face
       ctx.fillStyle = '#78350f';
       for (let ax = 28; ax < p.w - 28; ax += 38) {
         ctx.beginPath();
@@ -555,31 +888,26 @@ export class WorldRenderer {
       ctx.strokeStyle = '#3b1505';
       ctx.lineWidth = 3;
 
-      // Bottom cookie
       ctx.beginPath();
       ctx.roundRect(4, p.h * 0.52, p.w - 8, p.h * 0.42, 16);
       ctx.fill();
       ctx.stroke();
 
-      // Chocolate cream middle
       ctx.fillStyle = '#3f1d0b';
       ctx.fillRect(10, p.h * 0.42, p.w - 20, p.h * 0.16);
 
-      // Top cookie
       ctx.fillStyle = '#f59e0b';
       ctx.beginPath();
       ctx.roundRect(0, 0, p.w, p.h * 0.48, 18);
       ctx.fill();
       ctx.stroke();
 
-      // Glossy dark chocolate dip covering the left 45% of the cookie!
       ctx.fillStyle = '#3b180c';
       ctx.beginPath();
       ctx.roundRect(0, -1, p.w * 0.46, p.h * 0.92, [18, 6, 14, 16]);
       ctx.fill();
       ctx.stroke();
 
-      // Chocolate shine + cookie dots
       ctx.fillStyle = 'rgba(255,255,255,0.22)';
       ctx.beginPath();
       ctx.ellipse(p.w * 0.2, p.h * 0.2, 24, 6, -0.1, 0, Math.PI * 2);
@@ -601,7 +929,6 @@ export class WorldRenderer {
       ctx.fill();
       ctx.stroke();
 
-      // White royal icing piped along top edge
       ctx.strokeStyle = '#fff1f2';
       ctx.lineWidth = 6;
       ctx.lineCap = 'round';
@@ -613,7 +940,6 @@ export class WorldRenderer {
       ctx.stroke();
 
       if (p.isCheckpoint) {
-        // Golden Tamp Flagpost
         ctx.fillStyle = '#fbbf24';
         ctx.fillRect(p.w - 55, -62, 6, 62);
         ctx.fillStyle = '#ef4444';
@@ -1117,18 +1443,52 @@ export class WorldRenderer {
     ctx.ellipse(0, -15.2, 14.5, 2.7, 0, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Dynamic coffee splash wave when jumping or sprinting
-    if (!player.onGround || Math.abs(player.vx) > 120) {
+    // Dynamic coffee splash wave, flying droplets, and S-curved steam plume (Exact match to Reference Image 1!)
+    ctx.save();
+    const steamWiggle = Math.sin(time * 3.5) * 4;
+    const steamGrad = ctx.createLinearGradient(0, -18, 0, -68);
+    steamGrad.addColorStop(0, 'rgba(255, 255, 255, 0.45)');
+    steamGrad.addColorStop(0.6, 'rgba(235, 245, 255, 0.25)');
+    steamGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = steamGrad;
+    ctx.beginPath();
+    ctx.moveTo(-4, -18);
+    ctx.bezierCurveTo(-18 + steamWiggle, -34, 14 - steamWiggle, -48, -6 + steamWiggle, -68);
+    ctx.bezierCurveTo(18 - steamWiggle, -50, -6 + steamWiggle, -34, 6, -18);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    if (!player.onGround || Math.abs(player.vx) > 95) {
+      // Sculpted Coffee Splash Crown on the trailing rim of the cup (Reference Image 1!)
       ctx.fillStyle = '#5A2E17';
       ctx.strokeStyle = outlineCol;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.2;
       ctx.beginPath();
-      ctx.moveTo(-13, -16);
-      ctx.quadraticCurveTo(-7, -27 + slosh, 1, -20);
-      ctx.quadraticCurveTo(9, -25 - slosh, 14, -16);
+      ctx.moveTo(-19, -15.5);
+      ctx.bezierCurveTo(-24, -28 + slosh, -12, -31, -6, -22);
+      ctx.quadraticCurveTo(2, -28 - slosh, 11, -15.5);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
+
+      // Trailing airborne espresso droplets behind the cup (Reference Image 1!)
+      const dropOffsets = [
+        { dx: -27, dy: -24, r: 2.8 },
+        { dx: -33, dy: -16, r: 2.1 },
+        { dx: -28, dy: 14, r: 3.1 },
+        { dx: -36, dy: 22, r: 2.3 }
+      ];
+      dropOffsets.forEach((d, idx) => {
+        const bounce = Math.sin(time * 12 + idx) * 2;
+        ctx.fillStyle = '#743C1F';
+        ctx.strokeStyle = outlineCol;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.arc(d.dx, d.dy + bounce, d.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      });
     }
 
     // --- 6. Character Sheet Face (Shifts smoothly from Center FRONT to Right Profile SIDE) ---
@@ -1397,41 +1757,188 @@ export class WorldRenderer {
     const ctx = this.ctx;
     const blend = this.getBiomeBlend(cameraX);
 
-    // Swirling Milk Rapids (Zone 1 Image 1) blending into Boiling Crema & Espresso Lake (Zone 2 Image 2)
-    const topWaveColor = this.lerpColor('#fff7ed', '#f59e0b', blend);
-    const midLiquidColor = this.lerpColor('#fed7aa', '#92400e', blend);
-    const deepLiquidColor = this.lerpColor('#9a3412', '#3b1505', blend);
+    // 1. Swirling Creamy Milk Rapids & Curling Wave Crests (Reference Image 1 foreground!)
+    const topWaveColor = this.lerpColor('#fffaf0', '#f59e0b', blend);
+    const midLiquidColor = this.lerpColor('#f5d0a9', '#b45309', blend);
+    const deepLiquidColor = this.lerpColor('#8c421e', '#3b1505', blend);
 
-    const liqGrad = ctx.createLinearGradient(0, liquidY - 15, 0, this.height);
+    const liqGrad = ctx.createLinearGradient(0, liquidY - 22, 0, this.height);
     liqGrad.addColorStop(0, topWaveColor);
-    liqGrad.addColorStop(0.35, midLiquidColor);
+    liqGrad.addColorStop(0.42, midLiquidColor);
     liqGrad.addColorStop(1, deepLiquidColor);
 
     ctx.save();
     ctx.fillStyle = liqGrad;
-    ctx.strokeStyle = '#451a03';
-    ctx.lineWidth = 3.5;
+    ctx.strokeStyle = '#3b1704';
+    ctx.lineWidth = 3.2;
 
     ctx.beginPath();
-    ctx.moveTo(0, this.height);
-    for (let x = 0; x <= this.width + 30; x += 30) {
+    ctx.moveTo(-20, this.height);
+    for (let x = -20; x <= this.width + 40; x += 24) {
       const wx = x + cameraX;
-      const wave = Math.sin(wx * 0.018 + time * 3.8) * 9 + Math.cos(wx * 0.035 - time * 2.4) * 5;
+      const wave = Math.sin(wx * 0.016 + time * 3.4) * 10 + Math.cos(wx * 0.032 - time * 2.2) * 5;
       ctx.lineTo(x, liquidY + wave);
     }
-    ctx.lineTo(this.width, this.height);
+    ctx.lineTo(this.width + 40, this.height);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
 
-    // Swirling crema eddies on surface (like Image 2 foreground!)
-    ctx.strokeStyle = blend < 0.5 ? 'rgba(255, 255, 255, 0.65)' : 'rgba(254, 243, 199, 0.55)';
-    ctx.lineWidth = 3;
-    for (let i = 0; i < 9; i++) {
-      const sx = (((i * 210 - cameraX * 0.9) % (this.width + 180)) + (this.width + 180)) % (this.width + 180) - 90;
-      const sy = liquidY + 26 + (i % 2) * 14 + Math.sin(time * 3 + i) * 4;
+    // Sculpted Curling Milk Wave Crests & Splash Droplets (Reference Image 1 left & right wave curls!)
+    const curlSpacing = 340;
+    const firstCurl = Math.floor(cameraX / curlSpacing) - 1;
+    const lastCurl = firstCurl + Math.ceil(this.width / curlSpacing) + 3;
+
+    for (let ci = firstCurl; ci <= lastCurl; ci++) {
+      const wx = ci * curlSpacing + Math.sin(time * 1.5 + ci) * 18;
+      const sx = wx - cameraX;
+      const waveY = liquidY + Math.sin(wx * 0.016 + time * 3.4) * 8;
+      const dir = ci % 2 === 0 ? 1 : -1;
+
+      ctx.save();
+      ctx.translate(sx, waveY);
+      ctx.scale(dir, 1);
+
+      ctx.fillStyle = topWaveColor;
+      ctx.strokeStyle = '#3b1704';
+      ctx.lineWidth = 2.8;
       ctx.beginPath();
-      ctx.ellipse(sx, sy, 34, 8, 0, 0, Math.PI * 1.65);
+      ctx.moveTo(-45, 12);
+      ctx.bezierCurveTo(-20, -8, 10, -34, 34, -26);
+      ctx.bezierCurveTo(48, -20, 42, 2, 24, 4);
+      ctx.bezierCurveTo(14, 5, 8, -8, 18, -12);
+      ctx.quadraticCurveTo(-2, -2, -12, 16);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Splash droplets around the curling crest
+      ctx.fillStyle = topWaveColor;
+      ctx.beginPath();
+      ctx.arc(46, -24, 4.5, 0, Math.PI * 2);
+      ctx.arc(56, -12, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Caramel ribbon eddies flowing through the milk river
+    ctx.strokeStyle = blend < 0.5 ? 'rgba(217, 155, 102, 0.65)' : 'rgba(254, 240, 138, 0.55)';
+    ctx.lineWidth = 3.2;
+    for (let i = 0; i < 9; i++) {
+      const sx = (((i * 210 - cameraX * 0.85) % (this.width + 180)) + (this.width + 180)) % (this.width + 180) - 90;
+      const sy = liquidY + 24 + (i % 2) * 14 + Math.sin(time * 3 + i) * 4;
+      ctx.beginPath();
+      ctx.moveTo(sx - 38, sy);
+      ctx.bezierCurveTo(sx - 12, sy - 9, sx + 12, sy + 9, sx + 38, sy - 3);
+      ctx.stroke();
+    }
+
+    // 2. Ornate Carved Coffee-Bean Side Pillars & Corner Latte-Art Cups (Reference Image 1 Frame Borders!)
+    this.drawOrnateFrameBorders();
+
+    ctx.restore();
+  }
+
+  drawOrnateFrameBorders() {
+    const ctx = this.ctx;
+    const w = this.width;
+    const h = this.height;
+    const pillarW = 24;
+
+    ctx.save();
+    // Left & Right Carved Coffee-Bean Pillars
+    const drawPillar = (x, isRight) => {
+      const grad = ctx.createLinearGradient(x, 0, x + pillarW, 0);
+      grad.addColorStop(0, isRight ? '#7c4322' : '#331608');
+      grad.addColorStop(0.5, '#5c2e14');
+      grad.addColorStop(1, isRight ? '#331608' : '#7c4322');
+
+      ctx.fillStyle = grad;
+      ctx.strokeStyle = '#1f0b03';
+      ctx.lineWidth = 3;
+      ctx.fillRect(x, 0, pillarW, h);
+      ctx.strokeRect(x, 0, pillarW, h);
+
+      // Carved coffee beans stacked vertically inside the border pillar
+      for (let by = 28; by < h - 20; by += 34) {
+        ctx.save();
+        ctx.translate(x + pillarW / 2, by);
+        ctx.rotate((by % 68 === 0 ? 1 : -1) * 0.25);
+        ctx.fillStyle = '#47210c';
+        ctx.strokeStyle = '#240e04';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 8, 12, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, -8);
+        ctx.quadraticCurveTo(2.5, 0, 0, 8);
+        ctx.stroke();
+        ctx.restore();
+      }
+    };
+
+    drawPillar(0, false);
+    drawPillar(w - pillarW, true);
+
+    // Corner Latte Art & Roasted Bean Medallions (Bottom-Right, Top-Right, Bottom-Left just like Reference Image 1!)
+    this.drawCornerLatteCup(w - 8, h - 6, 52, true);
+    this.drawCornerLatteCup(w - 6, 4, 44, true);
+    this.drawCornerLatteCup(10, h - 4, 48, false);
+
+    ctx.restore();
+  }
+
+  drawCornerLatteCup(x, y, radius, hasRosetta) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(x, y);
+
+    // Ceramic Rim
+    ctx.fillStyle = '#fff6e8';
+    ctx.strokeStyle = '#2d1306';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Inner Crema Pool
+    ctx.fillStyle = '#c87d4b';
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 0.84, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    if (hasRosetta) {
+      // Creamy Heart / Rosetta Latte Art Leaves (Reference Image 1 bottom-right & top-right corners!)
+      ctx.fillStyle = '#fff8eb';
+      for (let i = -2; i <= 2; i++) {
+        ctx.save();
+        ctx.rotate(i * 0.35 - 0.6);
+        ctx.beginPath();
+        ctx.ellipse(0, -radius * 0.28, radius * 0.22, radius * 0.11, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.beginPath();
+      ctx.arc(-radius * 0.15, -radius * 0.15, radius * 0.18, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // Bottom-left emblem with central coffee bean (Reference Image 1 bottom-left corner!)
+      ctx.fillStyle = '#e7cfb4';
+      ctx.beginPath();
+      ctx.arc(0, 0, radius * 0.72, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#6f3618';
+      ctx.strokeStyle = '#2d1306';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.ellipse(-6, -6, 13, 17, 0.35, 0, Math.PI * 2);
+      ctx.fill();
       ctx.stroke();
     }
 

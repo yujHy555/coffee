@@ -43,9 +43,18 @@ export class CoffeePlatformerEngine {
     this.height = 640;
     this.width = Math.round(Math.max(460, Math.min(1850, 640 * aspect)));
 
-    this.canvas.width = this.width;
-    this.canvas.height = this.height;
-    this.renderer.resize(this.width, this.height);
+    // Render at native Retina / High-DPI physical pixel resolution (minimum 1.5x supersampling
+    // even on 1080p screens so strokes and facial details on the Coffee Cup are razor-sharp!)
+    const rawDpr = window.devicePixelRatio || 1;
+    const scaleFactor = Math.min(3, Math.max(1.5, rawDpr * (rect.height / 640)));
+    this.renderScale = scaleFactor;
+
+    this.canvas.width = Math.round(this.width * scaleFactor);
+    this.canvas.height = Math.round(this.height * scaleFactor);
+
+    this.ctx.imageSmoothingEnabled = true;
+    this.ctx.imageSmoothingQuality = 'high';
+    this.renderer.resize(this.width, this.height, scaleFactor);
   }
 
   resetLevel() {
@@ -623,7 +632,9 @@ export class CoffeePlatformerEngine {
 
   render() {
     const ctx = this.ctx;
+    const scale = this.renderScale || 1;
     ctx.save();
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
     // Screen shake offset
     let camX = this.cameraX;
