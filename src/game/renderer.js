@@ -1105,156 +1105,542 @@ export class WorldRenderer {
   drawEnemy(enemy, cameraX, time) {
     if (enemy.dead) return;
     const sx = enemy.x - cameraX;
-    if (sx < -80 || sx > this.width + 80) return;
+    if (sx < -100 || sx > this.width + 100) return;
 
     const ctx = this.ctx;
+    const facing = enemy.vx >= 0 ? 1 : -1;
+    const walkCycle = Math.sin(time * 11 + enemy.x * 0.04);
+
     ctx.save();
     ctx.translate(sx, enemy.y);
 
-    const walkCycle = Math.sin(time * 10 + enemy.x * 0.05);
+    // Warm ground contact shadow underneath enemy (Matches Character Design Sheet!)
+    const shadowY = enemy.type === 'steam_spirit' ? 30 : 28;
+    ctx.fillStyle = 'rgba(42, 18, 6, 0.28)';
+    ctx.beginPath();
+    ctx.ellipse(0, shadowY, 24, 5.5, 0, 0, Math.PI * 2);
+    ctx.fill();
 
-    if (enemy.type === 'spiked_bean' || enemy.type === 'roast_stalker') {
-      // Grumpy Roasted Bean Enemy (Image 1 Spiked Bean & Image 2 Stalker Bean)
-      // Animated little legs
-      ctx.strokeStyle = '#261005';
-      ctx.lineWidth = 4;
+    ctx.scale(facing, 1);
+
+    if (enemy.type === 'bean_grunt') {
+      // =========================================================================
+      // 1. COFFEE BEAN GRUNT (Exact match to Top Row of Enemy Character Sheet!)
+      // Vertical roasted coffee bean with top notch, S-cleft, angry white eyes,
+      // furrowed V-brow, rosy cheeks, frown, clenched fists, and maroon boots
+      // =========================================================================
+      const outlineCol = '#3B1A0B';
+      const limbCol = '#4D2310';
+
+      // Back Arm (curved outward with clenched fist)
+      ctx.save();
+      ctx.translate(-15, 2);
+      ctx.rotate(-walkCycle * 0.28);
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 4.6;
       ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(-9, 14);
-      ctx.lineTo(-12 + walkCycle * 6, 26);
-      ctx.moveTo(9, 14);
-      ctx.lineTo(12 - walkCycle * 6, 26);
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(-9, 3, -8, 12);
       ctx.stroke();
-
-      // Bean body
-      const grad = ctx.createRadialGradient(-5, -6, 4, 0, 0, 26);
-      grad.addColorStop(0, '#854d27');
-      grad.addColorStop(1, '#3b1c0a');
-      ctx.fillStyle = grad;
-      ctx.strokeStyle = '#1c0a02';
-      ctx.lineWidth = 3;
+      ctx.fillStyle = '#6E371B';
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.ellipse(0, 0, 21, 24, 0, 0, Math.PI * 2);
+      ctx.arc(-8, 13, 3.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      // Legs & Maroon Cuffed Boots (#8C2D2B)
+      const drawGruntBoot = (lx, ly, rot) => {
+        ctx.save();
+        ctx.translate(lx, ly);
+        ctx.rotate(rot);
+        ctx.strokeStyle = outlineCol;
+        ctx.lineWidth = 4.6;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(0, -8);
+        ctx.lineTo(0, 1);
+        ctx.stroke();
+
+        // Maroon boot with top cuff & rounded toe
+        ctx.fillStyle = '#8C2D2B';
+        ctx.strokeStyle = outlineCol;
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.roundRect(-4.5, -2, 9, 3, 1.2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(-4, 1);
+        ctx.lineTo(4, 1);
+        ctx.quadraticCurveTo(9.5, 1.5, 9, 6.5);
+        ctx.lineTo(-4.5, 6.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      };
+
+      drawGruntBoot(-7 + walkCycle * 6, 21 - Math.max(0, -walkCycle) * 3, -walkCycle * 0.3);
+      drawGruntBoot(7 - walkCycle * 6, 22 - Math.max(0, walkCycle) * 3, walkCycle * 0.3);
+
+      // Vertical Roasted Bean Body with top cleft notch
+      const beanGrad = ctx.createRadialGradient(-4, -8, 4, 0, 0, 26);
+      beanGrad.addColorStop(0, '#9E5834');
+      beanGrad.addColorStop(0.55, '#783D1E');
+      beanGrad.addColorStop(1, '#522611');
+
+      ctx.fillStyle = beanGrad;
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 3.2;
+      ctx.beginPath();
+      ctx.moveTo(0, -22);
+      ctx.bezierCurveTo(15, -25, 22, -10, 20, 6);
+      ctx.bezierCurveTo(18, 19, 8, 21, 0, 20);
+      ctx.bezierCurveTo(-12, 21, -21, 16, -21, 2);
+      ctx.bezierCurveTo(-21, -13, -13, -25, 0, -22);
+      ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
-      // Metal spikes on head if spiked_bean (Image 1!)
-      if (enemy.type === 'spiked_bean') {
-        const spikeAngles = [-0.65, -0.25, 0.25, 0.65];
-        spikeAngles.forEach((ang) => {
-          ctx.save();
-          ctx.rotate(ang);
-          ctx.fillStyle = '#e2e8f0';
-          ctx.strokeStyle = '#1e293b';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.moveTo(-5, -21);
-          ctx.lineTo(0, -34);
-          ctx.lineTo(5, -21);
-          ctx.closePath();
-          ctx.fill();
-          ctx.stroke();
-          ctx.restore();
-        });
-      }
-
-      // Angry white eyes & furrowed brow (Image 1)
-      ctx.fillStyle = '#ffffff';
+      // Upper-left specular highlight spots (exact match to sheet!)
+      ctx.fillStyle = 'rgba(222, 158, 115, 0.55)';
       ctx.beginPath();
-      ctx.arc(-7, -2, 4.5, 0, Math.PI * 2);
-      ctx.arc(7, -2, 4.5, 0, Math.PI * 2);
+      ctx.ellipse(-9, -13, 3.5, 2, -0.5, 0, Math.PI * 2);
+      ctx.ellipse(-13, -8, 1.8, 1.2, -0.5, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = '#0f172a';
+      // Vertical S-curve Coffee Bean Center Crease (shifted slightly right for 3/4 side look)
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 2.8;
       ctx.beginPath();
-      ctx.arc(-7, -1, 2.2, 0, Math.PI * 2);
-      ctx.arc(7, -1, 2.2, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Angry V-brow
-      ctx.strokeStyle = '#1c0a02';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(-14, -8);
-      ctx.lineTo(-2, -3);
-      ctx.moveTo(14, -8);
-      ctx.lineTo(2, -3);
-      ctx.stroke();
-    } else if (enemy.type === 'donut_roller') {
-      // Sprinting Glazed Ring Donut (Image 1 bottom right!)
-      // Running legs
-      ctx.strokeStyle = '#291306';
-      ctx.lineWidth = 3.5;
-      ctx.beginPath();
-      ctx.moveTo(-6, 18);
-      ctx.lineTo(-12 + walkCycle * 9, 27);
-      ctx.moveTo(6, 18);
-      ctx.lineTo(12 - walkCycle * 9, 27);
+      ctx.moveTo(2, -22);
+      ctx.bezierCurveTo(6, -10, 3, 6, 5, 20);
       ctx.stroke();
 
-      ctx.rotate(Math.sin(time * 8) * 0.15);
+      // Angry White Eyes with Dark Pupils & Furrowed V-Brow
+      ctx.save();
+      ctx.translate(3, 0);
 
-      // Golden glazed torus
-      const donutGrad = ctx.createRadialGradient(-4, -4, 5, 0, 0, 23);
-      donutGrad.addColorStop(0, '#fcd34d');
-      donutGrad.addColorStop(0.65, '#d97706');
-      donutGrad.addColorStop(1, '#92400e');
-
-      ctx.fillStyle = donutGrad;
-      ctx.strokeStyle = '#3b1505';
-      ctx.lineWidth = 3;
+      // Left Eye
+      ctx.fillStyle = '#FFFFFF';
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(0, 0, 21, 0, Math.PI * 2);
-      ctx.arc(0, 0, 7, 0, Math.PI * 2, true);
+      ctx.ellipse(-6.5, -3, 4.5, 3.8, 0.15, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
-      // Cute eyes on top of the donut ring (Image 1!)
-      ctx.fillStyle = '#1e1b18';
+      // Right Eye
       ctx.beginPath();
-      ctx.arc(-5, -12, 2.2, 0, Math.PI * 2);
-      ctx.arc(5, -12, 2.2, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (enemy.type === 'angry_sugar') {
-      // Angry Sugar Cube Enemy (Image 2 left & right!)
-      const hop = Math.abs(Math.sin(time * 6 + enemy.x)) * -8;
-      ctx.translate(0, hop);
-
-      // Little legs
-      ctx.strokeStyle = '#1e293b';
-      ctx.lineWidth = 3.5;
-      ctx.beginPath();
-      ctx.moveTo(-8, 16);
-      ctx.lineTo(-10 + walkCycle * 5, 26);
-      ctx.moveTo(8, 16);
-      ctx.lineTo(10 - walkCycle * 5, 26);
-      ctx.stroke();
-
-      // Sugar cube body
-      ctx.fillStyle = '#f8fafc';
-      ctx.strokeStyle = '#334155';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.roundRect(-18, -18, 36, 34, 6);
+      ctx.ellipse(6.5, -3, 4.2, 3.6, -0.15, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
-      // Scowling face (Image 2)
-      ctx.fillStyle = '#0f172a';
+      // Pupils & tiny white catchlights
+      ctx.fillStyle = '#1F0D05';
       ctx.beginPath();
-      ctx.arc(-6, -2, 2.6, 0, Math.PI * 2);
-      ctx.arc(6, -2, 2.6, 0, Math.PI * 2);
+      ctx.arc(-5.5, -2.8, 2, 0, Math.PI * 2);
+      ctx.arc(6.8, -2.8, 2, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.strokeStyle = '#0f172a';
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(-6, -3.5, 0.8, 0, Math.PI * 2);
+      ctx.arc(6.3, -3.5, 0.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Deep Furrowed V-Eyebrows
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 2.8;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-12, -8.5);
+      ctx.lineTo(-2, -4.8);
+      ctx.moveTo(11.5, -8.5);
+      ctx.lineTo(2.5, -4.8);
+      ctx.stroke();
+
+      // Warm Rosy Cheeks (#D97762)
+      ctx.fillStyle = 'rgba(225, 118, 98, 0.65)';
+      ctx.beginPath();
+      ctx.ellipse(-9.5, 2, 2.8, 1.6, 0, 0, Math.PI * 2);
+      ctx.ellipse(9.5, 2, 2.6, 1.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Grumpy Curved Frown
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(-3.5, 3.8);
+      ctx.quadraticCurveTo(0.5, 0.5, 4.2, 3.8);
+      ctx.stroke();
+      ctx.restore();
+
+      // Foreground Arm & Clenched Fist
+      ctx.save();
+      ctx.translate(-14, 3);
+      ctx.rotate(walkCycle * 0.35);
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 4.8;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(-6, 6, -4, 13);
+      ctx.stroke();
+      ctx.fillStyle = '#783D1E';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-4, 14, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    } else if (enemy.type === 'sugar_hopper') {
+      // =========================================================================
+      // 2. SUGAR CUBE HOPPER (Exact match to Middle Row of Enemy Character Sheet!)
+      // 3D Isometric Crystalline White Sugar Cube with bumpy granular edges,
+      // excited wide eyes, open laughing/shouting mouth with tongue, raised front
+      // fist, trailing back arm, and Red-and-White Striped Sneakers!
+      // =========================================================================
+      const outlineCol = '#4A2512';
+      const hopY = Math.abs(Math.sin(time * 7.5 + enemy.x * 0.03)) * -10;
+      ctx.translate(0, hopY);
+
+      // Speed / Hop motion lines behind cube (as shown in sheet!)
+      ctx.strokeStyle = 'rgba(180, 155, 135, 0.55)';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-29, -8);
+      ctx.lineTo(-23, -8);
+      ctx.moveTo(-31, 0);
+      ctx.lineTo(-24, 0);
+      ctx.stroke();
+
+      // Helper for Red-and-White Striped Sneakers (Exact match to sheet!)
+      const drawHopperSneaker = (lx, ly, rot) => {
+        ctx.save();
+        ctx.translate(lx, ly);
+        ctx.rotate(rot);
+
+        // Cream-white leg
+        ctx.fillStyle = '#F5EDE2';
+        ctx.strokeStyle = outlineCol;
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.roundRect(-2.5, -9, 5, 10, 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Red Sneaker Body
+        ctx.fillStyle = '#D63E34';
+        ctx.beginPath();
+        ctx.moveTo(-5, -1);
+        ctx.lineTo(4, -1);
+        ctx.quadraticCurveTo(12, 0, 12.5, 5.5);
+        ctx.lineTo(-5.5, 6.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // White Toe Cap & White Thick Sole
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(9.2, 3.8, 3, -Math.PI * 0.5, Math.PI * 0.5);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillRect(-5.5, 4.5, 17.5, 2.5);
+        ctx.strokeRect(-5.5, 4.5, 17.5, 2.5);
+
+        // Two White Laces / Stripes on Sneaker
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(1, 0);
+        ctx.lineTo(3, 3.5);
+        ctx.moveTo(4, 0.5);
+        ctx.lineTo(6, 3.5);
+        ctx.stroke();
+
+        ctx.restore();
+      };
+
+      // Back Leg & Sneaker
+      drawHopperSneaker(-8 - walkCycle * 7, 19, walkCycle * 0.45 + 0.2);
+      // Front Leg & Sneaker (kicking forward!)
+      drawHopperSneaker(8 + walkCycle * 7, 18, -walkCycle * 0.45 - 0.35);
+
+      // Trailing Left Arm (-X)
+      ctx.save();
+      ctx.translate(-18, 2);
+      ctx.rotate(0.35 + walkCycle * 0.25);
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(-8, 2, -10, 9);
+      ctx.stroke();
+      ctx.strokeStyle = '#F5EDE2';
       ctx.lineWidth = 2.6;
+      ctx.stroke();
+      ctx.fillStyle = '#F5EDE2';
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(-12, -8);
-      ctx.lineTo(-2, -4);
-      ctx.moveTo(12, -8);
-      ctx.lineTo(2, -4);
-      ctx.moveTo(-5, 7);
-      ctx.quadraticCurveTo(0, 3, 5, 7);
+      ctx.arc(-10, 10, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      // 3D Isometric Sugar Cube Body (Left shaded side, Top face, Right front face)
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 2.8;
+
+      // Left Shaded Face (#E5DCD0)
+      ctx.fillStyle = '#E5DCD0';
+      ctx.beginPath();
+      ctx.moveTo(-19, -13);
+      ctx.lineTo(-4, -9);
+      ctx.lineTo(-4, 15);
+      ctx.lineTo(-19, 10);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Top Face (#FFFFFF)
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.moveTo(-19, -13);
+      ctx.lineTo(3, -19);
+      ctx.lineTo(19, -13);
+      ctx.lineTo(-4, -9);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Front/Right Face (#FAF6F0) where the face sits
+      ctx.fillStyle = '#FAF6F0';
+      ctx.beginPath();
+      ctx.moveTo(-4, -9);
+      ctx.lineTo(19, -13);
+      ctx.lineTo(19, 11);
+      ctx.lineTo(-4, 15);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Granular Sugar Sparkle Texture Dots
+      ctx.fillStyle = '#D5C7B8';
+      const dots = [
+        [-14, -4], [-10, 4], [-15, 6], [0, -14], [6, -15], [14, 7], [-1, 10]
+      ];
+      dots.forEach(([dx, dy]) => {
+        ctx.fillRect(dx, dy, 2, 2);
+      });
+
+      // Excited Face on the Front/Right Cube Plane
+      ctx.save();
+      ctx.translate(8, 1);
+
+      // Wide Oval White Eyes with Big Dark Pupils
+      ctx.fillStyle = '#FFFFFF';
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(-4.5, -3.5, 3.4, 4.4, 0, 0, Math.PI * 2);
+      ctx.ellipse(4.8, -4.2, 3.2, 4.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#2B1408';
+      ctx.beginPath();
+      ctx.ellipse(-4, -3.2, 2, 2.8, 0, 0, Math.PI * 2);
+      ctx.ellipse(5.2, -3.9, 1.9, 2.7, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Eye Catchlights
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(-4.6, -4.6, 0.9, 0, Math.PI * 2);
+      ctx.arc(4.6, -5.2, 0.9, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Expressive Arched Eyebrows
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(-7.5, -9);
+      ctx.lineTo(-2, -8.5);
+      ctx.moveTo(2.5, -9.5);
+      ctx.lineTo(7.5, -9.5);
+      ctx.stroke();
+
+      // Pink Cheeks
+      ctx.fillStyle = '#F29B8E';
+      ctx.beginPath();
+      ctx.ellipse(-7, 2.2, 2.4, 1.4, 0, 0, Math.PI * 2);
+      ctx.ellipse(7.5, 1.2, 2.2, 1.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Wide Open Laughing/Battle-Cry Mouth with Red Tongue
+      ctx.fillStyle = '#5A1E14';
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-3.8, 1);
+      ctx.lineTo(4.2, 0.2);
+      ctx.bezierCurveTo(4.8, 7.5, -4.2, 8, -3.8, 1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#E8655A';
+      ctx.beginPath();
+      ctx.ellipse(0.3, 4.5, 2.5, 1.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // Raised Cheering Front Arm (+X) with Fist
+      ctx.save();
+      ctx.translate(18, 0);
+      ctx.rotate(-0.4 + walkCycle * 0.25);
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(7, -1, 9, -7);
+      ctx.stroke();
+      ctx.strokeStyle = '#F5EDE2';
+      ctx.lineWidth = 2.6;
+      ctx.stroke();
+      ctx.fillStyle = '#F5EDE2';
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(9, -8, 3.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    } else {
+      // =========================================================================
+      // 3. STEAM CLOUD SPIRIT (Exact match to Bottom Row of Enemy Character Sheet!)
+      // Floating creamy-white wispy steam ghost with top curl crest, inner spiral
+      // curls, mischievous eyes & smirk, floating wisp hands, and tapering tail!
+      // =========================================================================
+      const outlineCol = '#5E3A22';
+      const bob = Math.sin(time * 4.5 + enemy.x * 0.03) * 3;
+      ctx.translate(0, bob);
+
+      // Sculpted Wispy Steam Body with Top Curl Crest & Trailing Tail (Matches SIDE/FRONT sheet!)
+      const spiritGrad = ctx.createRadialGradient(2, -4, 4, 0, 0, 28);
+      spiritGrad.addColorStop(0, '#FFFDF9');
+      spiritGrad.addColorStop(0.65, '#F5E9D6');
+      spiritGrad.addColorStop(1, '#DFCBB0');
+
+      ctx.fillStyle = spiritGrad;
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 2.6;
+      ctx.lineJoin = 'round';
+
+      ctx.beginPath();
+      // Start at top-left wisp curl crest
+      ctx.moveTo(-8, -24);
+      ctx.bezierCurveTo(-2, -28, 12, -25, 17, -15);
+      ctx.bezierCurveTo(23, -8, 22, 6, 15, 14);
+      // Bottom sweeping ghostly tail curling back to the left (-X)
+      ctx.bezierCurveTo(8, 22, -8, 24, -22, 20);
+      ctx.bezierCurveTo(-30, 17, -31, 9, -25, 7);
+      ctx.bezierCurveTo(-21, 6, -19, 12, -23, 13);
+      ctx.quadraticCurveTo(-14, 15, -12, 8);
+      // Left billowing cloud puffs
+      ctx.bezierCurveTo(-21, 4, -22, -8, -14, -13);
+      ctx.bezierCurveTo(-18, -18, -14, -24, -8, -24);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Inner Decorative Cream Spiral Curls (Signature detail on Steam Cloud Spirit!)
+      ctx.strokeStyle = '#C9B193';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      const drawSpiritCurl = (cx, cy, r) => {
+        ctx.beginPath();
+        for (let a = 0; a < Math.PI * 2.4; a += 0.25) {
+          const rad = r * (1 - a / (Math.PI * 2.8));
+          const px = cx + Math.cos(a) * rad;
+          const py = cy + Math.sin(a) * rad;
+          if (a === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+      };
+      drawSpiritCurl(-9, -6, 6.5);
+      drawSpiritCurl(-6, 9, 5.5);
+
+      // Mischievous Angled Eyes, Rosy Cheeks & Smirk/Open Grin
+      ctx.save();
+      ctx.translate(6, -3);
+
+      // Eyes
+      ctx.fillStyle = '#4A2512';
+      ctx.beginPath();
+      ctx.ellipse(-4.5, -1, 2.5, 3.2, 0.15, 0, Math.PI * 2);
+      ctx.ellipse(5.5, -1.5, 2.3, 3, -0.15, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(-4.8, -2, 0.9, 0, Math.PI * 2);
+      ctx.arc(5.2, -2.5, 0.9, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Mischievous V-Brows
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(-8, -5.5);
+      ctx.lineTo(-2, -3.2);
+      ctx.moveTo(8.5, -6);
+      ctx.lineTo(3, -3.5);
+      ctx.stroke();
+
+      // Soft Peach Cheeks
+      ctx.fillStyle = 'rgba(242, 155, 142, 0.55)';
+      ctx.beginPath();
+      ctx.ellipse(-6.8, 2.8, 2.4, 1.3, 0, 0, Math.PI * 2);
+      ctx.ellipse(7.2, 2.2, 2.2, 1.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Mischievous Grin
+      ctx.fillStyle = '#6E261A';
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(-3, 2.5);
+      ctx.quadraticCurveTo(1, 1.5, 4, 2.2);
+      ctx.bezierCurveTo(3.5, 6.5, -2.5, 6.5, -3, 2.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      // Wispy Curling Arms (Front & Side)
+      ctx.strokeStyle = outlineCol;
+      ctx.fillStyle = '#F5E9D6';
+      ctx.lineWidth = 2.2;
+      // Front reaching wisp hand
+      ctx.beginPath();
+      ctx.moveTo(16, 4);
+      ctx.quadraticCurveTo(25, 1, 25, 7);
+      ctx.quadraticCurveTo(23, 11, 15, 8);
+      ctx.fill();
       ctx.stroke();
     }
 
@@ -1268,6 +1654,14 @@ export class WorldRenderer {
 
     ctx.save();
     ctx.translate(sx, sy);
+
+    // Warm ground shadow beneath protagonist when near ground (Matches Character Design Sheet!)
+    if (player.onGround) {
+      ctx.fillStyle = 'rgba(42, 18, 6, 0.26)';
+      ctx.beginPath();
+      ctx.ellipse(0, 27, 26, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     // Invulnerability flash
     if (player.invulnTimer > 0 && Math.floor(time * 20) % 2 === 0) {
@@ -1285,39 +1679,42 @@ export class WorldRenderer {
       ctx.stroke();
     }
 
-    // Smoothly blend between FRONT view (0) when idle and 3/4 SIDE profile (1) when running/attacking
-    const speedRatio = Math.min(1, Math.abs(player.vx) / 140);
+    // Smoothly blend between FRONT VIEW (0) when idle and SIDE VIEW (1) when running/jumping/attacking
+    // Matches the exact COFFEE CUP (CHARACTER DESIGN) sheet!
+    const speedRatio = Math.min(1, Math.abs(player.vx) / 135);
     const isAction = !player.onGround || player.meleeTimer > 0 || player.shotCooldown > 0.1;
-    const sideMix = isAction ? Math.max(0.75, speedRatio) : speedRatio * 0.85;
+    const sideMix = isAction ? Math.max(0.82, speedRatio) : speedRatio * 0.9;
 
     ctx.scale(player.facing, 1);
 
-    // Dynamic squash & stretch + subtle forward run lean
-    const tilt = player.vx * 0.00038 * player.facing;
+    // Dynamic squash & stretch + subtle run lean
+    const tilt = player.vx * 0.00035 * player.facing;
     ctx.rotate(tilt);
     ctx.scale(player.scaleX, player.scaleY);
 
-    // Character Sheet Palette Constants:
-    // Outline: #432212 | Cream Body: #F5E3C8 | Shadow Cream: #DEC39D | Highlight: #FFF9EE
-    // Coffee: #5A2E17 & #743C1F | Boot Red: #C63B33 | Cheek Coral: #F19483
     const outlineCol = '#432212';
-    const limbCol = '#522915';
 
-    // --- 1. Back Arm (Visible in FRONT & 3/4 view, swings opposite to front arm) ---
     const runSwing = player.onGround
       ? Math.sin(player.animTime * 15) * Math.min(1, Math.abs(player.vx) / 170)
       : -0.55;
 
-    if (sideMix < 0.92) {
-      ctx.save();
-      const backArmX = -21 + sideMix * 10;
-      ctx.translate(backArmX, 3);
-      ctx.rotate(-runSwing * 0.45);
-      this.drawProtagonistArm(ctx, -1, false, false, 0);
-      ctx.restore();
-    }
+    // --- 1. Far/Reaching Arm (In FRONT VIEW: cheerful raised waving arm on the cup's side; In SIDE VIEW: extends forward from the front edge!) ---
+    ctx.save();
+    const waveX = (1 - sideMix) * -23 + sideMix * 19;
+    const waveY = (1 - sideMix) * 1 + sideMix * 3;
+    ctx.translate(waveX, waveY);
+    this.drawProtagonistArm(
+      ctx,
+      sideMix > 0.45 ? 1 : -1,
+      true, // Waving / reaching open 4-finger hand from the new sheet!
+      false,
+      0,
+      false,
+      runSwing * 0.35 + Math.sin(time * 6) * 0.08
+    );
+    ctx.restore();
 
-    // --- 2. Legs & Cuffed Red Boots (Exact match to Character Sheet!) ---
+    // --- 2. Legs & Cuffed Red Boots (Exact match to COFFEE CUP Character Design Sheet!) ---
     const stride = runSwing * 10;
     const leftLegX = -8 + sideMix * 5 + stride;
     const rightLegX = 8 - sideMix * 3 - stride;
@@ -1337,38 +1734,35 @@ export class WorldRenderer {
       0.35 + sideMix * 0.65
     );
 
-    // --- 3. Thick Rounded C-Handle on the Left (-X) Side (Matches FRONT & SIDE views) ---
-    ctx.save();
-    const handleOffsetX = -23 + sideMix * 1.5;
-    ctx.translate(handleOffsetX, -2);
+    // --- 3. Handle in FRONT VIEW (Sits on the side of the cup when sideMix is low) ---
+    if (sideMix < 0.55) {
+      ctx.save();
+      ctx.translate(23, -1);
+      ctx.fillStyle = '#E8CFB0';
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 3.4;
+      ctx.beginPath();
+      ctx.arc(0, 0, 11.5, -Math.PI * 0.55, Math.PI * 0.55);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
 
-    // Outer C-handle loop
-    ctx.fillStyle = '#E8CFB0';
-    ctx.strokeStyle = outlineCol;
-    ctx.lineWidth = 3.4;
-    ctx.beginPath();
-    ctx.arc(0, 0, 11.5, Math.PI * 0.42, Math.PI * 1.58);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+      ctx.fillStyle = '#24314c';
+      ctx.beginPath();
+      ctx.arc(-1, 0, 5.2, -Math.PI * 0.5, Math.PI * 0.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
 
-    // Inner C-handle cutout
-    ctx.fillStyle = '#24314c'; // Dark interior shadow
-    ctx.beginPath();
-    ctx.arc(1, 0, 5.2, Math.PI * 0.48, Math.PI * 1.52);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-
-    // --- 4. Wide Rounded Cream Porcelain Cup Body (Character Sheet Proportions) ---
+    // --- 4. Wide Rounded Cream Porcelain Cup Body (Exact COFFEE CUP Sheet Proportions & Shading) ---
     ctx.save();
     ctx.fillStyle = '#F5E3C8';
     ctx.strokeStyle = outlineCol;
     ctx.lineWidth = 3.5;
     ctx.lineJoin = 'round';
 
-    // Bowl path: wide top (-25 to +25), smoothly rounded teacup base
     ctx.beginPath();
     ctx.moveTo(-25, -16);
     ctx.lineTo(25, -16);
@@ -1377,29 +1771,29 @@ export class WorldRenderer {
     ctx.closePath();
     ctx.fill();
 
-    // Clip inside the cup body to paint the warm shading & glossy highlight from the sheet
+    // Clip inside cup body for warm crescent shadow (#DEC39D) & glossy vertical highlight (#FFF9EE)
     ctx.save();
     ctx.clip();
 
-    // Left & Bottom Crescent Shadow (#DEC39D)
     ctx.fillStyle = '#DEC39D';
     ctx.beginPath();
-    ctx.moveTo(-26, -18);
-    ctx.quadraticCurveTo(-18, 13, 22, 14);
+    ctx.moveTo(-26, 12);
+    ctx.quadraticCurveTo(8, 15, 18, -18);
+    ctx.lineTo(26, -18);
     ctx.lineTo(26, 22);
     ctx.lineTo(-26, 22);
     ctx.closePath();
     ctx.fill();
 
-    // Right Vertical Glossy Cream Highlight (#FFF9EE)
-    ctx.fillStyle = 'rgba(255, 250, 240, 0.85)';
+    // Glossy white vertical highlight on the leading/front curve (Exact match to both FRONT & SIDE views!)
+    ctx.fillStyle = 'rgba(255, 252, 245, 0.88)';
     ctx.beginPath();
-    ctx.ellipse(18 - sideMix * 3, -2, 3.8, 11, 0.12, 0, Math.PI * 2);
+    ctx.ellipse(-16 + sideMix * 33, -2, 3.6, 11, -0.08, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.restore();
 
-    // Re-stroke outer cup contour cleanly over clipped shading
+    // Re-stroke outer cup contour cleanly
     ctx.strokeStyle = outlineCol;
     ctx.lineWidth = 3.5;
     ctx.beginPath();
@@ -1410,8 +1804,7 @@ export class WorldRenderer {
     ctx.closePath();
     ctx.stroke();
 
-    // --- 5. Thick Ceramic Top Rim & Concentric Rich Coffee Surface (Character Sheet Detail!) ---
-    // Outer ceramic rim lip
+    // --- 5. Thick Ceramic Top Rim, Bubbly Crema Foam & Dynamic Splash Crown (Exact match to COFFEE CUP Sheet!) ---
     ctx.fillStyle = '#FFF6E8';
     ctx.strokeStyle = outlineCol;
     ctx.lineWidth = 3.3;
@@ -1420,14 +1813,13 @@ export class WorldRenderer {
     ctx.fill();
     ctx.stroke();
 
-    // Inner rim shadow wall
     ctx.fillStyle = '#DFC4A2';
     ctx.beginPath();
     ctx.ellipse(0, -15.5, 21.5, 5.2, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Rich roast coffee pool with concentric crema rings
-    const slosh = Math.sin(time * 9) * 2.4;
+    // Rich roast coffee surface
+    const slosh = Math.sin(time * 9) * 2.2;
     ctx.fillStyle = '#5A2E17';
     ctx.strokeStyle = outlineCol;
     ctx.lineWidth = 2.2;
@@ -1436,149 +1828,175 @@ export class WorldRenderer {
     ctx.fill();
     ctx.stroke();
 
-    // Lighter crema ring inside coffee surface (exact match to sheet)
-    ctx.strokeStyle = '#7A4123';
-    ctx.lineWidth = 1.8;
+    // Sculpted Bubbly Sloshing Coffee Wave & Crema Bubbles inside the rim (Shown in both FRONT & SIDE views of the new sheet!)
+    ctx.fillStyle = '#6E381D';
+    ctx.strokeStyle = outlineCol;
+    ctx.lineWidth = 2.1;
     ctx.beginPath();
-    ctx.ellipse(0, -15.2, 14.5, 2.7, 0, 0, Math.PI * 2);
+    ctx.moveTo(-18, -15.5);
+    ctx.quadraticCurveTo(-11, -21 + slosh * 0.6, -3, -17);
+    ctx.quadraticCurveTo(6, -24 - slosh * 0.8, 12, -26 - Math.abs(slosh));
+    ctx.quadraticCurveTo(18, -27, 16, -15.5);
+    ctx.closePath();
+    ctx.fill();
     ctx.stroke();
 
-    // Dynamic coffee splash wave, flying droplets, and S-curved steam plume (Exact match to Reference Image 1!)
+    // Crema foam bubbles on the coffee surface (Exact detail from sheet!)
+    const bubbles = [
+      { bx: -11, by: -16.5, br: 2.3 },
+      { bx: -6, by: -15.2, br: 1.6 },
+      { bx: 3, by: -16.2, br: 2.1 },
+      { bx: 9, by: -15.5, br: 1.5 }
+    ];
+    bubbles.forEach((b) => {
+      ctx.fillStyle = '#C88A5A';
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.arc(b.bx, b.by, b.br, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    });
+
+    // Airborne Coffee Droplets & S-Curved Steam Plume above the cup (Exact match to FRONT/SIDE/BACK sheet!)
     ctx.save();
     const steamWiggle = Math.sin(time * 3.5) * 4;
-    const steamGrad = ctx.createLinearGradient(0, -18, 0, -68);
-    steamGrad.addColorStop(0, 'rgba(255, 255, 255, 0.45)');
-    steamGrad.addColorStop(0.6, 'rgba(235, 245, 255, 0.25)');
-    steamGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    const steamGrad = ctx.createLinearGradient(0, -20, 0, -68);
+    steamGrad.addColorStop(0, 'rgba(255, 250, 240, 0.42)');
+    steamGrad.addColorStop(0.6, 'rgba(245, 235, 220, 0.22)');
+    steamGrad.addColorStop(1, 'rgba(255, 250, 240, 0)');
     ctx.fillStyle = steamGrad;
     ctx.beginPath();
-    ctx.moveTo(-4, -18);
-    ctx.bezierCurveTo(-18 + steamWiggle, -34, 14 - steamWiggle, -48, -6 + steamWiggle, -68);
-    ctx.bezierCurveTo(18 - steamWiggle, -50, -6 + steamWiggle, -34, 6, -18);
+    ctx.moveTo(-4, -20);
+    ctx.bezierCurveTo(-16 + steamWiggle, -35, 14 - steamWiggle, -48, -5 + steamWiggle, -68);
+    ctx.bezierCurveTo(17 - steamWiggle, -50, -5 + steamWiggle, -35, 6, -20);
     ctx.closePath();
     ctx.fill();
     ctx.restore();
 
-    if (!player.onGround || Math.abs(player.vx) > 95) {
-      // Sculpted Coffee Splash Crown on the trailing rim of the cup (Reference Image 1!)
-      ctx.fillStyle = '#5A2E17';
+    const dropOffsets = [
+      { dx: -10, dy: -26, r: 2.4 },
+      { dx: -2, dy: -31, r: 2.9 },
+      { dx: 11, dy: -32, r: 2.2 },
+      { dx: 18, dy: -25, r: 1.8 }
+    ];
+    dropOffsets.forEach((d, idx) => {
+      const bounce = Math.sin(time * 10 + idx * 1.4) * 2.5;
+      ctx.fillStyle = '#6E381D';
       ctx.strokeStyle = outlineCol;
-      ctx.lineWidth = 2.2;
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.moveTo(-19, -15.5);
-      ctx.bezierCurveTo(-24, -28 + slosh, -12, -31, -6, -22);
-      ctx.quadraticCurveTo(2, -28 - slosh, 11, -15.5);
-      ctx.closePath();
+      ctx.arc(d.dx, d.dy + bounce, d.r, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
+    });
 
-      // Trailing airborne espresso droplets behind the cup (Reference Image 1!)
-      const dropOffsets = [
-        { dx: -27, dy: -24, r: 2.8 },
-        { dx: -33, dy: -16, r: 2.1 },
-        { dx: -28, dy: 14, r: 3.1 },
-        { dx: -36, dy: 22, r: 2.3 }
-      ];
-      dropOffsets.forEach((d, idx) => {
-        const bounce = Math.sin(time * 12 + idx) * 2;
-        ctx.fillStyle = '#743C1F';
-        ctx.strokeStyle = outlineCol;
-        ctx.lineWidth = 1.6;
-        ctx.beginPath();
-        ctx.arc(d.dx, d.dy + bounce, d.r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-      });
-    }
-
-    // --- 6. Character Sheet Face (Shifts smoothly from Center FRONT to Right Profile SIDE) ---
-    const faceShiftX = sideMix * 10.5;
+    // --- 6. Character Sheet Face (Shifts smoothly from Center FRONT VIEW to Leading Edge in SIDE VIEW) ---
+    const faceShiftX = sideMix * 11.5;
     ctx.save();
     ctx.translate(faceShiftX, 0);
 
-    // Left Eye (Approaches right eye and foreshortens as cup turns to SIDE view)
-    const leftEyeX = -9.5 + sideMix * 4.5;
-    const leftEyeScaleX = 1 - sideMix * 0.35;
+    // Left/Near Eye
+    const leftEyeX = -9.5 + sideMix * 5.5;
+    const leftEyeScaleX = 1 - sideMix * 0.22;
     ctx.fillStyle = outlineCol;
     ctx.beginPath();
-    ctx.ellipse(leftEyeX, -1.5, 3.3 * leftEyeScaleX, 3.8, 0, 0, Math.PI * 2);
+    ctx.ellipse(leftEyeX, -1.5, 3.3 * leftEyeScaleX, 3.9, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Left Eye Upper-Right Catchlight (Matches sheet!)
     ctx.fillStyle = '#FFFFFF';
     ctx.beginPath();
     ctx.arc(leftEyeX + 0.9 * leftEyeScaleX, -2.8, 1.25 * leftEyeScaleX, 0, Math.PI * 2);
     ctx.fill();
 
-    // Right Eye (Foreshortens slightly at extreme profile)
-    const rightEyeX = 9.5 - sideMix * 1.5;
-    const rightEyeScaleX = 1 - sideMix * 0.25;
-    ctx.fillStyle = outlineCol;
-    ctx.beginPath();
-    ctx.ellipse(rightEyeX, -1.5, 3.3 * rightEyeScaleX, 3.8, 0, 0, Math.PI * 2);
-    ctx.fill();
+    // Right/Far Eye (Visible in FRONT view, wraps onto the leading profile edge in SIDE view)
+    if (sideMix < 0.78) {
+      const rightEyeX = 9.5 - sideMix * 1.5;
+      const rightEyeScaleX = 1 - sideMix * 0.35;
+      ctx.fillStyle = outlineCol;
+      ctx.beginPath();
+      ctx.ellipse(rightEyeX, -1.5, 3.3 * rightEyeScaleX, 3.9, 0, 0, Math.PI * 2);
+      ctx.fill();
 
-    // Right Eye Catchlight
-    ctx.fillStyle = '#FFFFFF';
-    ctx.beginPath();
-    ctx.arc(rightEyeX + 0.9 * rightEyeScaleX, -2.8, 1.25 * rightEyeScaleX, 0, Math.PI * 2);
-    ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(rightEyeX + 0.9 * rightEyeScaleX, -2.8, 1.25 * rightEyeScaleX, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     // Warm Coral-Pink Oval Cheeks (#F19483)
     ctx.fillStyle = '#F19483';
-    // Near cheek (prominent in both FRONT and SIDE view)
     ctx.beginPath();
-    ctx.ellipse(leftEyeX - 3.5 * (1 - sideMix * 0.5), 3.8, 4.2, 2.3, 0, 0, Math.PI * 2);
+    ctx.ellipse(leftEyeX - 3.2 * (1 - sideMix * 0.4), 3.8, 4.2, 2.3, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Far cheek (fades as it wraps around the right edge in SIDE view)
-    if (sideMix < 0.75) {
-      ctx.globalAlpha = (1 - sideMix / 0.75) * (player.invulnTimer > 0 ? 0.55 : 1);
+    if (sideMix < 0.72) {
       ctx.beginPath();
-      ctx.ellipse(rightEyeX + 3.2, 3.8, 3.8, 2.2, 0, 0, Math.PI * 2);
+      ctx.ellipse(12.2, 3.8, 3.8, 2.2, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.globalAlpha = player.invulnTimer > 0 && Math.floor(time * 20) % 2 === 0 ? 0.55 : 1;
     }
 
-    // Happy Bean-Shaped Open Smile with Coral Tongue (#432212 cavity + #F08070 tongue)
-    const mouthX = sideMix * 3.2;
+    // Happy Open Smile with Coral Tongue (#4A2112 cavity + #F08070 tongue)
+    const mouthX = sideMix * 5.8;
     ctx.save();
     ctx.translate(mouthX, 2.2);
     ctx.fillStyle = '#4A2112';
     ctx.strokeStyle = outlineCol;
     ctx.lineWidth = 2.1;
     ctx.beginPath();
-    ctx.moveTo(-3.8, -0.5);
+    ctx.moveTo(-3.8 * (1 - sideMix * 0.25), -0.5);
     ctx.quadraticCurveTo(0, 0.8, 3.8, -0.5);
-    ctx.bezierCurveTo(4.2, 5.2, -4.2, 5.2, -3.8, -0.5);
+    ctx.bezierCurveTo(4.2, 5.2, -4.2 * (1 - sideMix * 0.25), 5.2, -3.8 * (1 - sideMix * 0.25), -0.5);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
 
-    // Pinkish-coral tongue inside lower mouth
     ctx.fillStyle = '#F08070';
     ctx.beginPath();
-    ctx.ellipse(0, 2.5, 2.4, 1.4, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 2.5, 2.3 * (1 - sideMix * 0.2), 1.4, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
     ctx.restore(); // end face group
 
-    // --- 7. Foreground Arm (Swings at side in FRONT view, reaches forward in SIDE view, or slashes Silver Spoon!) ---
+    // --- 7. Foreground Foreshortened C-Handle on the Side of the Cup in SIDE VIEW! ---
+    // (Matches the exact middle illustration of your COFFEE CUP Character Design Sheet!)
+    if (sideMix >= 0.55) {
+      ctx.save();
+      ctx.translate(-9, -1);
+      ctx.fillStyle = '#E8CFB0';
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 3.2;
+      ctx.beginPath();
+      ctx.roundRect(-4.5, -11.5, 9, 23, 4.5);
+      ctx.fill();
+      ctx.stroke();
+
+      // Inner handle groove
+      ctx.strokeStyle = '#C9AC86';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, -7);
+      ctx.lineTo(0, 7);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // --- 8. Near/Side Arm (Curved at side in SIDE VIEW, or swings the Silver Barista Spoon!) ---
     ctx.save();
     const spoonUpgraded = unlockedPowerups.has('silver_spoon');
-    const frontArmX = (1 - sideMix) * 21 + sideMix * -3;
-    const frontArmY = 3.5;
+    const nearArmX = (1 - sideMix) * 21 + sideMix * 2;
+    const nearArmY = (1 - sideMix) * 4 + sideMix * 8;
 
-    ctx.translate(frontArmX, frontArmY);
+    ctx.translate(nearArmX, nearArmY);
     this.drawProtagonistArm(
       ctx,
       1,
-      sideMix > 0.45,
+      false,
       player.meleeTimer > 0,
       player.meleeTimer,
       spoonUpgraded,
-      runSwing * 0.4
+      -runSwing * 0.35
     );
     ctx.restore();
 
@@ -1586,7 +2004,7 @@ export class WorldRenderer {
     ctx.restore();
   }
 
-  drawProtagonistArm(ctx, dir, isSidePointing, isSlashing, meleeTimer, spoonUpgraded = false, walkSwing = 0) {
+  drawProtagonistArm(ctx, dir, isWaving, isSlashing, meleeTimer, spoonUpgraded = false, walkSwing = 0) {
     const limbCol = '#522915';
     const outlineCol = '#3A1B0C';
 
@@ -1625,41 +2043,48 @@ export class WorldRenderer {
       ctx.beginPath();
       ctx.arc(0, 0, spoonUpgraded ? 48 : 35, -1.25, 1.15);
       ctx.stroke();
-    } else if (isSidePointing) {
-      // Exact SIDE View Arm from Character Sheet: reaches forward horizontally across body with cute pointing finger!
-      ctx.rotate(walkSwing * 0.25);
+    } else if (isWaving) {
+      // Exact Raised Waving / Reaching 4-Finger Hand from COFFEE CUP Character Design Sheet!
+      ctx.rotate(walkSwing * 0.35);
 
       ctx.strokeStyle = outlineCol;
       ctx.lineWidth = 5.4;
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.quadraticCurveTo(13, 4.5, 27, 1.5);
+      ctx.quadraticCurveTo(dir * 9, -2, dir * 13, -11);
       ctx.stroke();
 
       ctx.strokeStyle = limbCol;
       ctx.lineWidth = 3.6;
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.quadraticCurveTo(13, 4.5, 27, 1.5);
+      ctx.quadraticCurveTo(dir * 9, -2, dir * 13, -11);
       ctx.stroke();
 
-      // Cute pointing hand (thumb up + index finger forward)
+      // Cute spread 4-fingered hand
       ctx.fillStyle = limbCol;
       ctx.strokeStyle = outlineCol;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1.8;
       ctx.beginPath();
-      ctx.ellipse(28, 1.2, 3.8, 2.8, 0, 0, Math.PI * 2);
+      ctx.arc(dir * 14, -12, 3.6, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
-      // Pointing finger tip
-      ctx.beginPath();
-      ctx.roundRect(29, -1, 5.5, 2.8, 1.4);
-      ctx.fill();
-      ctx.stroke();
+      // Little spread fingers
+      const fingerAngles = [-0.6, -0.15, 0.3];
+      fingerAngles.forEach((fa) => {
+        ctx.save();
+        ctx.translate(dir * 14, -12);
+        ctx.rotate(fa * dir);
+        ctx.beginPath();
+        ctx.roundRect(dir > 0 ? 1 : -5.5, -2.5, 4.5, 2.2, 1);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      });
     } else {
-      // Exact FRONT View Arm from Character Sheet: curved downward at side with cute 3-finger hand
+      // Exact Curved Lower Arm from SIDE/FRONT View of COFFEE CUP Sheet
       ctx.rotate(walkSwing);
 
       ctx.strokeStyle = outlineCol;
@@ -1667,22 +2092,21 @@ export class WorldRenderer {
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.quadraticCurveTo(dir * 6, 7, dir * 5, 16);
+      ctx.quadraticCurveTo(dir * 3, 7, dir * 10, 4);
       ctx.stroke();
 
       ctx.strokeStyle = limbCol;
       ctx.lineWidth = 3.4;
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.quadraticCurveTo(dir * 6, 7, dir * 5, 16);
+      ctx.quadraticCurveTo(dir * 3, 7, dir * 10, 4);
       ctx.stroke();
 
-      // Cute 3-fingered dark-brown hand
       ctx.fillStyle = limbCol;
       ctx.strokeStyle = outlineCol;
       ctx.lineWidth = 1.8;
       ctx.beginPath();
-      ctx.arc(dir * 5, 17, 3.2, 0, Math.PI * 2);
+      ctx.arc(dir * 11, 3.8, 3.2, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     }
@@ -1716,7 +2140,7 @@ export class WorldRenderer {
     ctx.lineTo(0, 2);
     ctx.stroke();
 
-    // Red Boot Shaft & Rounded Toe (Matches Character Sheet Palette Icon!)
+    // Red Boot Shaft & Rounded Toe (Matches Character Sheet!)
     const toeExt = 5 + toeProfile * 4.5;
     ctx.fillStyle = bootRed;
     ctx.strokeStyle = outlineCol;
@@ -1733,7 +2157,7 @@ export class WorldRenderer {
     ctx.fill();
     ctx.stroke();
 
-    // Top Boot Cuff Rim (as seen in FRONT/SIDE/BACK views)
+    // Top Boot Cuff Rim
     ctx.fillStyle = bootRed;
     ctx.beginPath();
     ctx.roundRect(-5.6, -2.5, 10.6, 3.2, 1.5);

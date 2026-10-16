@@ -545,7 +545,7 @@ export class CoffeePlatformerEngine {
       }
     }
 
-    // Update Enemies
+    // Update Enemies (Coffee Bean Grunt, Sugar Cube Hopper, Steam Cloud Spirit)
     for (const enemy of this.level.enemies) {
       if (enemy.dead) continue;
       enemy.x += enemy.vx * dt;
@@ -557,6 +557,10 @@ export class CoffeePlatformerEngine {
         enemy.vx = -Math.abs(enemy.vx);
       }
 
+      if (enemy.type === 'steam_spirit' && enemy.baseY !== undefined) {
+        enemy.y = enemy.baseY + Math.sin(this.time * 3.8 + enemy.x * 0.02) * 14;
+      }
+
       // Player vs Enemy collision
       const dx = p.x - enemy.x;
       const dy = p.y - enemy.y;
@@ -564,11 +568,11 @@ export class CoffeePlatformerEngine {
 
       if (dist < p.r + 22) {
         // Check if player is stomping from above
-        const isStomping = p.vy > 40 && p.y < enemy.y - 8;
+        const isStomping = p.vy > 40 && p.y < enemy.y - 6;
 
         if (p.dashTimer > 0 && this.unlockedPowerups.has('nitro_shield')) {
           this.damageEnemy(enemy, 2, p.facing * 260);
-        } else if (isStomping && enemy.type !== 'spiked_bean') {
+        } else if (isStomping) {
           p.vy = -480;
           p.scaleX = 1.25;
           p.scaleY = 0.75;

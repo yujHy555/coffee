@@ -113,50 +113,50 @@ export function createLevelData() {
   addArc(6140, 260, 220, 65, 5);
   addArc(6450, 225, 200, 65, 5);
 
-  // Enemies inspired directly by Image 1 & Image 2:
-  // - 'spiked_bean': Grumpy coffee bean with metal spikes on head (immune to stomp unless upgraded, weak to Spoon Melee & Espresso Shot!)
-  // - 'donut_roller': Glazed donut with cute eyes that sprints and bounces along platforms (stompable, melee-able, shootable)
-  // - 'angry_sugar': Angry furrowed-brow sugar cube from Image 2 that hops and throws sugar shards
-  // - 'roast_stalker': Grumpy dark coffee bean walker from Image 2
+  // Enemies matching the official COFFEE-THEMED ENEMIES Character Design Sheet:
+  // - 'bean_grunt': COFFEE BEAN GRUNT (Vertical roasted coffee bean with center cleft, angry white eyes, V-brow, rosy cheeks, maroon boots)
+  // - 'sugar_hopper': SUGAR CUBE HOPPER (3D sparkling sugar cube with excited open mouth, raised fist, and red-and-white striped sneakers)
+  // - 'steam_spirit': STEAM CLOUD SPIRIT (Floating creamy-white wispy steam ghost with spiral curls, mischievous grin, and hovering tail)
   const enemies = [
     {
       id: 'e1',
-      type: 'spiked_bean',
+      type: 'bean_grunt',
       x: 1220,
-      y: 466,
+      y: 484,
       minX: 1100,
       maxX: 1420,
-      vx: -75,
+      vx: -78,
       hp: 2,
       maxHp: 2
     },
     {
       id: 'e2',
-      type: 'donut_roller',
+      type: 'sugar_hopper',
       x: 1520,
-      y: 466,
+      y: 484,
       minX: 1320,
       maxX: 1630,
-      vx: -135,
+      vx: -125,
       hp: 1,
       maxHp: 1
     },
     {
       id: 'e3',
-      type: 'roast_stalker',
+      type: 'steam_spirit',
       x: 2110,
-      y: 346,
-      minX: 2050,
-      maxX: 2200,
-      vx: 65,
+      y: 350,
+      baseY: 350,
+      minX: 2020,
+      maxX: 2240,
+      vx: 75,
       hp: 1,
       maxHp: 1
     },
     {
       id: 'e4',
-      type: 'spiked_bean',
+      type: 'bean_grunt',
       x: 2620,
-      y: 456,
+      y: 474,
       minX: 2470,
       maxX: 2760,
       vx: 85,
@@ -165,68 +165,70 @@ export function createLevelData() {
     },
     {
       id: 'e5',
-      type: 'donut_roller',
+      type: 'sugar_hopper',
       x: 2880,
-      y: 456,
+      y: 474,
       minX: 2680,
       maxX: 2950,
-      vx: -145,
-      hp: 1,
-      maxHp: 1
+      vx: -135,
+      hp: 2,
+      maxHp: 2
     },
-    // Zone 2 Enemies (Angry Sugar Cubes & Roast Stalkers from Image 2)
+    // Zone 2 Enemies
     {
       id: 'e6',
-      type: 'angry_sugar',
+      type: 'sugar_hopper',
       x: 3560,
-      y: 428,
+      y: 444,
       minX: 3380,
       maxX: 3660,
-      vx: -70,
+      vx: -95,
       hp: 2,
       maxHp: 2
     },
     {
       id: 'e7',
-      type: 'roast_stalker',
+      type: 'steam_spirit',
       x: 4220,
-      y: 386,
-      minX: 4120,
-      maxX: 4350,
-      vx: 80,
+      y: 380,
+      baseY: 380,
+      minX: 4100,
+      maxX: 4380,
+      vx: 88,
       hp: 2,
       maxHp: 2
     },
     {
       id: 'e8',
-      type: 'angry_sugar',
+      type: 'sugar_hopper',
       x: 5180,
-      y: 413,
+      y: 429,
       minX: 5080,
       maxX: 5360,
-      vx: -85,
+      vx: -110,
       hp: 2,
       maxHp: 2
     },
     {
       id: 'e9',
-      type: 'roast_stalker',
+      type: 'bean_grunt',
       x: 5450,
-      y: 413,
+      y: 429,
       minX: 5300,
       maxX: 5580,
-      vx: 90,
+      vx: 92,
       hp: 2,
       maxHp: 2
     },
     {
       id: 'e10',
-      type: 'donut_roller',
+      type: 'steam_spirit',
       x: 6110,
-      y: 311,
-      minX: 6005,
-      maxX: 6220,
-      vx: -150,
+      y: 305,
+      baseY: 305,
+      minX: 5990,
+      maxX: 6240,
+      vx: -115,
       hp: 2,
       maxHp: 2
     }
