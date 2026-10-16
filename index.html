@@ -44,13 +44,17 @@
                   <div class="caffeine-bar-fill" id="hud-caffeine" style="width: 65%"></div>
                   <span class="caffeine-label">CREMA ENERGY</span>
                 </div>
+                <div class="jetpack-bar-frame" id="hud-jetpack-frame" style="display:none; position:relative; width:130px; height:13px; background:rgba(12,18,32,0.85); border:1.5px solid #38bdf8; border-radius:6px; overflow:hidden; box-shadow:0 0 10px rgba(56,189,248,0.4);">
+                  <div class="jetpack-bar-fill" id="hud-jetpack" style="width:100%; height:100%; background:linear-gradient(90deg, #0284c7, #38bdf8, #facc15);"></div>
+                  <span style="position:absolute; left:0; right:0; top:0; bottom:0; display:flex; align-items:center; justify-content:center; font-size:8.5px; font-weight:800; color:#fff; text-shadow:0 1px 2px #000; letter-spacing:0.5px;">🚀 JETPACK FUEL</span>
+                </div>
                 <div class="biome-pill" id="hud-biome">★ Starry Espresso Hills</div>
               </div>
             </div>
 
             <!-- Top-Center: Quick Action Bar -->
             <div class="hud-center">
-              <button class="level-select-btn" id="level-select-btn" title="Switch Level (Level 1 / Level 2)">
+              <button class="level-select-btn" id="level-select-btn" title="Switch Level (Level 1 / 2 / 3)">
                 <span id="hud-level-badge">LVL 1</span>
               </button>
               <button class="vault-trigger-btn" id="open-vault-btn">
@@ -75,6 +79,11 @@
                 <span class="bean-multiplier">×</span>
                 <span id="hud-gems">0</span>
               </div>
+              <div class="star-counter-row" id="hud-stars-row" style="display:none; align-items:center; gap:6px; font-size:18px; font-weight:700; color:#7dd3fc; text-shadow: 0 2px 0 #0369a1;">
+                <span>⭐</span>
+                <span class="bean-multiplier">×</span>
+                <span id="hud-stars">0</span>
+              </div>
               <div class="score-row">
                 <span class="score-label">SCORE:</span>
                 <span class="score-value" id="hud-score">000,000</span>
@@ -90,7 +99,8 @@
           <div class="controls-bar">
             <div class="desktop-controls-hint">
               <span><kbd>A</kbd><kbd>D</kbd> or <kbd>◀</kbd><kbd>▶</kbd> Move</span>
-              <span><kbd>Space</kbd> / <kbd>W</kbd> Double Jump</span>
+              <span><kbd>Space</kbd> / <kbd>W</kbd> Jump / Hold Thrusters</span>
+              <span id="hint-jetpack" style="display:none; color:#38bdf8;"><kbd>Space</kbd> Fly 🚀</span>
               <span><kbd>Z</kbd> / <kbd>J</kbd> Silver Spoon</span>
               <span id="hint-shot"><kbd>X</kbd> / <kbd>Click</kbd> Glock 16mm</span>
               <span><kbd>Shift</kbd> Frothy Dash</span>
@@ -103,7 +113,7 @@
               <div class="touch-actions">
                 <button class="touch-btn action-spoon" data-tap="KeyZ">🥄 Slash</button>
                 <button class="touch-btn action-shot" id="touch-shot-btn" data-tap="KeyX">🔫 Glock</button>
-                <button class="touch-btn action-jump" data-tap="Space">⬆ Jump</button>
+                <button class="touch-btn action-jump" id="touch-jump-btn" data-tap="Space" data-key="Space">⬆ Jump</button>
               </div>
             </div>
           </div>

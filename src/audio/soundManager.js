@@ -5,6 +5,8 @@ class SoundManager {
     this.bgmPlaying = false;
     this.bgmTimer = null;
     this.stepIndex = 0;
+    this.jetpackActive = false;
+    this.jetpackNodes = null;
   }
 
   init() {
@@ -291,6 +293,132 @@ class SoundManager {
       osc.start(t);
       osc.stop(t + 0.19);
     });
+  }
+
+  startJetpackSound() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+    if (this.jetpackActive && this.jetpackNodes) return;
+
+    this.jetpackActive = true;
+    const now = this.ctx.currentTime;
+
+    // Create white noise buffer for continuous rocket steam hiss
+    const bufferSize = Math.floor(this.ctx.sampleRate * 1.5);
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const output = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      output[i] = Math.random() * 2 - 1;
+    }
+
+    const whiteNoise = this.ctx.createBufferSource();
+    whiteNoise.buffer = buffer;
+    whiteNoise.loop = true;
+
+    // Resonant bandpass filter
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(680, now);
+    filter.Q.setValueAtTime(3.2, now);
+
+    // Deep sub-bass rocket turbine rumble
+    const rumbleOsc = this.ctx.createOscillator();
+    rumbleOsc.type = 'triangle';
+    rumbleOsc.frequency.setValueAtTime(95, now);
+
+    const rumbleGain = this.ctx.createGain();
+    rumbleGain.gain.setValueAtTime(0.12, now);
+
+    // Master jetpack gain
+    const masterGain = this.ctx.createGain();
+    masterGain.gain.setValueAtTime(0.001, now);
+    masterGain.gain.linearRampToValueAtTime(0.22, now + 0.06);
+
+    whiteNoise.connect(filter);
+    filter.connect(masterGain);
+
+    rumbleOsc.connect(rumbleGain);
+    rumbleGain.connect(masterGain);
+
+    masterGain.connect(this.ctx.destination);
+
+    whiteNoise.start(now);
+    rumbleOsc.start(now);
+
+    this.jetpackNodes = { whiteNoise, filter, rumbleOsc, masterGain };
+  }
+
+  updateJetpackSound(intensity = 1) {
+    if (!this.jetpackNodes || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    const freq = 650 + Math.min(1, intensity) * 850;
+    this.jetpackNodes.filter.frequency.setTargetAtTime(freq, now, 0.05);
+    this.jetpackNodes.masterGain.gain.setTargetAtTime(0.16 + intensity * 0.08, now, 0.05);
+  }
+
+  stopJetpackSound() {
+    if (!this.jetpackActive || !this.jetpackNodes || !this.ctx) return;
+    this.jetpackActive = false;
+    const now = this.ctx.currentTime;
+    const nodes = this.jetpackNodes;
+    this.jetpackNodes = null;
+
+    nodes.masterGain.gain.linearRampToValueAtTime(0.0001, now + 0.08);
+    setTimeout(() => {
+      try {
+        nodes.whiteNoise.stop();
+        nodes.rumbleOsc.stop();
+        nodes.whiteNoise.disconnect();
+        nodes.rumbleOsc.disconnect();
+        nodes.masterGain.disconnect();
+      } catch (e) {}
+    }, 100);
+  }
+
+  playJetpackPickup() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    // Ascending brass/synth powerup fanfare
+    const freqs = [392.0, 523.25, 659.25, 783.99, 1046.5];
+    freqs.forEach((freq, idx) => {
+      const t = this.ctx.currentTime + idx * 0.045;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq, t);
+
+      gain.gain.setValueAtTime(0.18, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.23);
+    });
+  }
+
+  playRingFlythrough() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, now);
+    osc.frequency.exponentialRampToValueAtTime(1760, now + 0.15);
+
+    gain.gain.setValueAtTime(0.24, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.21);
   }
 }
 

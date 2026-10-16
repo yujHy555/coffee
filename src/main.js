@@ -14,6 +14,12 @@ const hudLevelBadge = document.getElementById('hud-level-badge');
 const levelSelectBtn = document.getElementById('level-select-btn');
 const hudGemsRow = document.getElementById('hud-gems-row');
 const hudGems = document.getElementById('hud-gems');
+const hudStarsRow = document.getElementById('hud-stars-row');
+const hudStars = document.getElementById('hud-stars');
+const hudJetpackFrame = document.getElementById('hud-jetpack-frame');
+const hudJetpack = document.getElementById('hud-jetpack');
+const hintJetpack = document.getElementById('hint-jetpack');
+const touchJumpBtn = document.getElementById('touch-jump-btn');
 
 // Modals
 const productModal = document.getElementById('product-modal');
@@ -30,7 +36,7 @@ const hintShot = document.getElementById('hint-shot');
 
 const engine = new CoffeePlatformerEngine(canvas, {
   onHudUpdate: (state) => {
-    // Render Hearts & Weapon Badge
+    // Render Hearts, Weapon & Jetpack Badges
     let heartsHtml = '';
     for (let i = 0; i < state.maxHp; i++) {
       heartsHtml += `<span class="heart ${i < state.hp ? 'active' : ''}">❤</span>`;
@@ -45,6 +51,9 @@ const engine = new CoffeePlatformerEngine(canvas, {
         heartsHtml += `<span class="heart active" title="Black Glock 16mm Equipped" style="color:#fde047; text-shadow: 0 0 8px rgba(253, 224, 71, 0.8)">🔫</span>`;
       }
     }
+    if (state.hasJetpack) {
+      heartsHtml += `<span class="heart active" title="Steam Turbo Jetpack Equipped" style="color:#38bdf8; text-shadow: 0 0 10px rgba(56, 189, 248, 0.9)">🚀</span>`;
+    }
     hudHearts.innerHTML = heartsHtml;
 
     hudCaffeine.style.width = `${state.caffeine}%`;
@@ -55,14 +64,14 @@ const engine = new CoffeePlatformerEngine(canvas, {
 
     // Update Level Indicator Badge & Switcher Button
     if (hudLevelBadge) {
-      hudLevelBadge.textContent = state.level === 2 ? 'LVL 2: GROTTO' : 'LVL 1: ESPRESSO';
+      if (state.level === 3) hudLevelBadge.textContent = 'LVL 3: ORBIT';
+      else if (state.level === 2) hudLevelBadge.textContent = 'LVL 2: GROTTO';
+      else hudLevelBadge.textContent = 'LVL 1: ESPRESSO';
     }
     if (levelSelectBtn) {
-      if (state.level === 2) {
-        levelSelectBtn.classList.add('lvl2');
-      } else {
-        levelSelectBtn.classList.remove('lvl2');
-      }
+      levelSelectBtn.classList.remove('lvl2', 'lvl3');
+      if (state.level === 3) levelSelectBtn.classList.add('lvl3');
+      else if (state.level === 2) levelSelectBtn.classList.add('lvl2');
     }
 
     // Sugar Gems counter for Level 2
@@ -73,6 +82,35 @@ const engine = new CoffeePlatformerEngine(canvas, {
       } else {
         hudGemsRow.style.display = 'none';
       }
+    }
+
+    // Stellar Star Beans counter for Level 3
+    if (hudStarsRow && hudStars) {
+      if (state.level === 3) {
+        hudStarsRow.style.display = 'flex';
+        hudStars.textContent = state.starBeans;
+      } else {
+        hudStarsRow.style.display = 'none';
+      }
+    }
+
+    // Thruster Jetpack Fuel Gauge & Controls
+    if (hudJetpackFrame && hudJetpack) {
+      if (state.hasJetpack) {
+        hudJetpackFrame.style.display = 'block';
+        hudJetpack.style.width = `${state.jetpackFuel}%`;
+        hudJetpack.style.background = state.jetpackActive
+          ? 'linear-gradient(90deg, #f97316, #fde047)'
+          : 'linear-gradient(90deg, #0284c7, #38bdf8, #facc15)';
+      } else {
+        hudJetpackFrame.style.display = 'none';
+      }
+    }
+    if (hintJetpack) {
+      hintJetpack.style.display = state.hasJetpack ? 'inline' : 'none';
+    }
+    if (touchJumpBtn) {
+      touchJumpBtn.innerHTML = state.hasJetpack ? '🚀 Thrust' : '⬆ Jump';
     }
 
     // Weapon Action Buttons & Controls Bar Hints
@@ -197,10 +235,18 @@ function showVictoryModal(stats) {
       victoryNextBtn.style.display = 'inline-block';
       victoryNextBtn.textContent = 'Proceed to Level 2: Neon Grotto ➔';
     }
-  } else {
-    if (victoryBadge) victoryBadge.textContent = '🏆 MASTER BARISTA CHAMPION 🏆';
+  } else if (stats.level === 2) {
+    if (victoryBadge) victoryBadge.textContent = '🌋 LEVEL 2 CONQUERED! 🌋';
     if (victoryTitle) victoryTitle.textContent = 'You Conquered the Frothy Caramel Caldera!';
-    if (victoryDesc) victoryDesc.textContent = 'You have mastered both coffee realms with legendary roasted agility and firepower!';
+    if (victoryDesc) victoryDesc.textContent = 'The stratosphere beckons! Ascend into the celestial clouds with the Steam Turbo Jetpack!';
+    if (victoryNextBtn) {
+      victoryNextBtn.style.display = 'inline-block';
+      victoryNextBtn.textContent = 'Ascend to Level 3: Stratosphere ➔';
+    }
+  } else {
+    if (victoryBadge) victoryBadge.textContent = '🌌 SUPREME GALACTIC BARISTA CHAMPION 🌌';
+    if (victoryTitle) victoryTitle.textContent = 'The Great Orbital Roastery is Reached!';
+    if (victoryDesc) victoryDesc.textContent = 'You have mastered the heavens with the Steam Turbo Jetpack and unified all coffee realms!';
     if (victoryNextBtn) {
       victoryNextBtn.style.display = 'inline-block';
       victoryNextBtn.textContent = 'Replay Level 1 ↺';
@@ -217,6 +263,17 @@ function showVictoryModal(stats) {
       <div class="stat-box">
         <strong>${stats.pods}</strong>
         <span>CACAO PODS</span>
+      </div>
+    `;
+  } else if (stats.level === 3) {
+    extraStats = `
+      <div class="stat-box">
+        <strong>${stats.starBeans || 0}</strong>
+        <span>STAR BEANS</span>
+      </div>
+      <div class="stat-box">
+        <strong>${stats.celestialOrbs || 0}</strong>
+        <span>CELESTIAL ORBS</span>
       </div>
     `;
   }
@@ -242,7 +299,7 @@ function showVictoryModal(stats) {
 // Level Switcher Quick Action
 if (levelSelectBtn) {
   levelSelectBtn.addEventListener('click', () => {
-    const nextLvl = engine.currentLevel === 1 ? 2 : 1;
+    const nextLvl = (engine.currentLevel % 3) + 1;
     engine.loadLevel(nextLvl);
   });
 }
@@ -275,6 +332,8 @@ if (victoryNextBtn) {
     victoryModal.classList.add('hidden');
     if (engine.currentLevel === 1) {
       engine.loadLevel(2);
+    } else if (engine.currentLevel === 2) {
+      engine.loadLevel(3);
     } else {
       engine.loadLevel(1);
     }

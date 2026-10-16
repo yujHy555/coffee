@@ -50,6 +50,66 @@ export class WorldRenderer {
     const ctx = this.ctx;
     const blend = this.getBiomeBlend(cameraX);
 
+    if (this.currentLevel === 3) {
+      // Level 3 Sky Gradient: Cloudtop Stratosphere (golden peach/sunset violet) -> Celestial Star-Roast Orbit (deep space cosmic void)
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, this.height * 0.9);
+      skyGrad.addColorStop(0, this.lerpColor('#2e1065', '#020617', blend));
+      skyGrad.addColorStop(0.3, this.lerpColor('#4c1d95', '#0f172a', blend));
+      skyGrad.addColorStop(0.6, this.lerpColor('#7c2d12', '#1e1b4b', blend));
+      skyGrad.addColorStop(0.85, this.lerpColor('#ea580c', '#312e81', blend));
+      skyGrad.addColorStop(1, this.lerpColor('#fde047', '#0369a1', blend));
+
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, this.width, this.height);
+
+      // Cosmic stars, nebula dust, and planetary rings
+      ctx.save();
+      this.stars.forEach((s) => {
+        const sx = ((s.x - cameraX * 0.04) % this.width + this.width) % this.width;
+        const twinkle = 0.45 + 0.55 * Math.sin(time * 3.6 + s.phase);
+        ctx.fillStyle = s.isCross ? `rgba(56, 189, 248, ${twinkle * 0.95})` : `rgba(254, 240, 138, ${twinkle * 0.85})`;
+        ctx.beginPath();
+        ctx.arc(sx, s.y, s.r * 1.3, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (s.isCross && twinkle > 0.6) {
+          this.drawFourPointSparkle(sx, s.y, s.r * 5, `rgba(125, 211, 252, ${twinkle})`);
+        }
+      });
+
+      // Distant ringed coffee planet in Zone 2
+      if (blend > 0.2) {
+        const planetAlpha = Math.min(1, (blend - 0.2) * 1.5);
+        ctx.save();
+        ctx.globalAlpha = planetAlpha;
+        const px = ((2400 - cameraX * 0.03) % (this.width + 400) + (this.width + 400)) % (this.width + 400) - 100;
+        const py = 120;
+
+        // Swirling espresso latte globe
+        const pGrad = ctx.createRadialGradient(px - 14, py - 14, 8, px, py, 42);
+        pGrad.addColorStop(0, '#fef08a');
+        pGrad.addColorStop(0.4, '#d97706');
+        pGrad.addColorStop(0.8, '#78350f');
+        pGrad.addColorStop(1, '#1e1b4b');
+        ctx.fillStyle = pGrad;
+        ctx.beginPath();
+        ctx.arc(px, py, 38, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Planetary foam rings
+        ctx.strokeStyle = 'rgba(253, 230, 138, 0.65)';
+        ctx.lineWidth = 4.5;
+        ctx.beginPath();
+        ctx.ellipse(px, py, 68, 16, -0.28, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
+      ctx.restore();
+      return;
+    }
+
     if (this.currentLevel === 2) {
       // Level 2 Sky Gradient: Neon Mocha Grotto (deep obsidian/amethyst violet) -> Frothy Caramel Caldera (fiery sunset amber/caramel)
       const skyGrad = ctx.createLinearGradient(0, 0, 0, this.height * 0.85);
@@ -253,6 +313,88 @@ export class WorldRenderer {
   drawParallaxBackground(cameraX, time) {
     const ctx = this.ctx;
     const blend = this.getBiomeBlend(cameraX);
+
+    if (this.currentLevel === 3) {
+      // Level 3 Stratosphere & Cosmic Orbit Parallax
+      ctx.save();
+
+      // Distant Floating Steampunk Airships sailing across the sky
+      const airshipCoords = [
+        { wx: 480, y: 170, scale: 0.65 },
+        { wx: 1680, y: 130, scale: 0.5 },
+        { wx: 2980, y: 190, scale: 0.7 },
+        { wx: 4240, y: 140, scale: 0.55 },
+        { wx: 5640, y: 210, scale: 0.65 },
+        { wx: 6840, y: 150, scale: 0.5 }
+      ];
+
+      airshipCoords.forEach((ship, idx) => {
+        const sx = ship.wx - cameraX * 0.22;
+        if (sx < -160 || sx > this.width + 160) return;
+        const bob = Math.sin(time * 1.5 + idx) * 8;
+        ctx.save();
+        ctx.translate(sx, ship.y + bob);
+        ctx.scale(ship.scale, ship.scale);
+
+        // Zeppelin gasbag (warm cappuccino cream)
+        const bagGrad = ctx.createLinearGradient(0, -25, 0, 25);
+        bagGrad.addColorStop(0, '#fef3c7');
+        bagGrad.addColorStop(0.5, '#f59e0b');
+        bagGrad.addColorStop(1, '#92400e');
+        ctx.fillStyle = bagGrad;
+        ctx.strokeStyle = '#451a03';
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 52, 22, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Lower gondola cabin
+        ctx.fillStyle = '#b45309';
+        ctx.beginPath();
+        ctx.roundRect(-24, 20, 48, 12, 3);
+        ctx.fill();
+        ctx.stroke();
+
+        // Tiny glowing cabin portholes
+        ctx.fillStyle = '#fde047';
+        for (let p = -16; p <= 16; p += 8) {
+          ctx.beginPath();
+          ctx.arc(p, 26, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Turning aft propeller
+        ctx.save();
+        ctx.translate(56, 0);
+        ctx.rotate(time * 18);
+        ctx.strokeStyle = '#78350f';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, -14);
+        ctx.lineTo(0, 14);
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.restore();
+      });
+
+      // Lower atmospheric cloud sea
+      ctx.fillStyle = blend < 0.5 ? 'rgba(254, 243, 199, 0.45)' : 'rgba(30, 27, 75, 0.55)';
+      ctx.beginPath();
+      ctx.moveTo(-20, this.height);
+      for (let x = -20; x <= this.width + 40; x += 36) {
+        const worldX = x + cameraX * 0.35;
+        const y = 490 + Math.sin(worldX * 0.005) * 26 + Math.cos(worldX * 0.012) * 12;
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(this.width + 40, this.height);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.restore();
+      return;
+    }
 
     // Distant hazy roastery skyline silhouettes (Moka pots, silos, portafilter towers in mist as seen in Image 1 center horizon)
     ctx.save();
@@ -1205,6 +1347,158 @@ export class WorldRenderer {
       ctx.closePath();
       ctx.fill();
       ctx.restore();
+    } else if (p.type === 'cappuccino_cloud') {
+      // Cinnamon-Dusted Whipped Cream Foam Cloud Platform
+      const bob = Math.sin(time * 2.6 + p.x * 0.02) * 3.5;
+      ctx.translate(0, bob);
+
+      // Cloud base shadow
+      ctx.fillStyle = 'rgba(180, 83, 9, 0.16)';
+      ctx.beginPath();
+      ctx.ellipse(p.w * 0.5, p.h * 0.72, p.w * 0.48, p.h * 0.38, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Bubbly overlapping cream puffs
+      const cGrad = ctx.createLinearGradient(0, 0, 0, p.h);
+      cGrad.addColorStop(0, '#ffffff');
+      cGrad.addColorStop(0.35, '#fffbeb');
+      cGrad.addColorStop(0.75, '#fef3c7');
+      cGrad.addColorStop(1, '#fde68a');
+
+      ctx.fillStyle = cGrad;
+      ctx.strokeStyle = '#92400e';
+      ctx.lineWidth = 2.6;
+
+      ctx.beginPath();
+      const puffCount = Math.max(4, Math.round(p.w / 46));
+      const step = p.w / puffCount;
+      ctx.moveTo(10, p.h * 0.5);
+      for (let i = 0; i < puffCount; i++) {
+        const px = i * step + step * 0.5;
+        const py = i === 0 || i === puffCount - 1 ? 14 : 6;
+        const r = step * 0.58;
+        ctx.arc(px, py, r, Math.PI * 0.88, Math.PI * 0.12, false);
+      }
+      ctx.lineTo(p.w - 8, p.h * 0.68);
+      ctx.quadraticCurveTo(p.w * 0.5, p.h + 8, 8, p.h * 0.68);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Cinnamon powder dusting on top
+      ctx.fillStyle = '#b45309';
+      for (let s = 14; s < p.w - 14; s += 8) {
+        const sy = 4 + Math.sin(s * 1.7) * 4;
+        ctx.fillRect(s, sy, 2, 2);
+      }
+    } else if (p.type === 'airship_deck') {
+      // Victorian Steampunk Brass Airship Platform with Rivets & Propeller
+      const bob = Math.sin(time * 1.8 + p.x * 0.015) * 2;
+      ctx.translate(0, bob);
+
+      // Brass deck plate
+      const deckGrad = ctx.createLinearGradient(0, 0, 0, p.h);
+      deckGrad.addColorStop(0, '#fef08a');
+      deckGrad.addColorStop(0.2, '#f59e0b');
+      deckGrad.addColorStop(0.7, '#b45309');
+      deckGrad.addColorStop(1, '#451a03');
+
+      ctx.fillStyle = deckGrad;
+      ctx.strokeStyle = '#291105';
+      ctx.lineWidth = 2.8;
+      ctx.beginPath();
+      ctx.roundRect(0, 0, p.w, p.h, [8, 8, 4, 4]);
+      ctx.fill();
+      ctx.stroke();
+
+      // Polished copper rivets along the edges
+      ctx.fillStyle = '#451a03';
+      for (let rx = 10; rx < p.w - 10; rx += 22) {
+        ctx.beginPath();
+        ctx.arc(rx, 8, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Spinning brass propeller on the left or bottom
+      const propAngle = time * 24;
+      ctx.save();
+      ctx.translate(14, p.h + 8);
+      ctx.rotate(propAngle);
+      ctx.fillStyle = '#d97706';
+      ctx.strokeStyle = '#78350f';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 14, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      if (p.isCheckpoint) {
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillRect(p.w - 55, -62, 6, 62);
+        ctx.fillStyle = '#7dd3fc';
+        ctx.beginPath();
+        ctx.moveTo(p.w - 49, -62);
+        ctx.lineTo(p.w - 12, -46);
+        ctx.lineTo(p.w - 49, -30);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      if (p.isFinish) {
+        this.drawOrbitalRoasteryFinish(p.w * 0.55, 0, time);
+      }
+    } else if (p.type === 'stellar_quartz') {
+      // Cosmic Starry Quartz Asteroid
+      const qGrad = ctx.createLinearGradient(0, 0, 0, p.h);
+      qGrad.addColorStop(0, '#bae6fd');
+      qGrad.addColorStop(0.35, '#38bdf8');
+      qGrad.addColorStop(0.8, '#0369a1');
+      qGrad.addColorStop(1, '#082f49');
+
+      ctx.fillStyle = qGrad;
+      ctx.strokeStyle = '#0c4a6e';
+      ctx.lineWidth = 2.8;
+      ctx.beginPath();
+      ctx.roundRect(0, 0, p.w, p.h, [12, 12, 6, 6]);
+      ctx.fill();
+      ctx.stroke();
+
+      // Faceted crystalline spikes
+      ctx.fillStyle = '#e0f2fe';
+      for (let cx = 14; cx < p.w - 14; cx += 26) {
+        ctx.beginPath();
+        ctx.moveTo(cx, 0);
+        ctx.lineTo(cx + 10, -7);
+        ctx.lineTo(cx + 20, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+    } else if (p.type === 'cosmic_rock') {
+      // Roasted Meteorite Bean Asteroid with Golden Caramel Veins
+      const rGrad = ctx.createLinearGradient(0, 0, 0, p.h);
+      rGrad.addColorStop(0, '#2e1065');
+      rGrad.addColorStop(0.35, '#1e1b4b');
+      rGrad.addColorStop(1, '#09090b');
+
+      ctx.fillStyle = rGrad;
+      ctx.strokeStyle = '#4c1d95';
+      ctx.lineWidth = 2.6;
+      ctx.beginPath();
+      ctx.roundRect(0, 0, p.w, p.h, 12);
+      ctx.fill();
+      ctx.stroke();
+
+      // Glowing molten golden caramel fissures
+      ctx.strokeStyle = '#facc15';
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.moveTo(18, p.h * 0.4);
+      ctx.lineTo(p.w * 0.35, p.h * 0.55);
+      ctx.lineTo(p.w * 0.65, p.h * 0.35);
+      ctx.lineTo(p.w - 24, p.h * 0.6);
+      ctx.stroke();
     }
 
     ctx.restore();
@@ -1249,6 +1543,91 @@ export class WorldRenderer {
     ctx.font = 'bold 12px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('CELESTIAL OBSERVATORY', 0, -192);
+    ctx.restore();
+  }
+
+  drawOrbitalRoasteryFinish(x, y, time) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(x, y);
+
+    // Rotating Great Celestial Astrolabe Rings
+    const ringAngle = time * 0.7;
+    ctx.save();
+    ctx.translate(0, -95);
+    ctx.rotate(ringAngle);
+    ctx.strokeStyle = 'rgba(250, 204, 21, 0.75)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, 68, 0, Math.PI * 2);
+    ctx.stroke();
+    for (let i = 0; i < 4; i++) {
+      ctx.rotate(Math.PI / 2);
+      ctx.fillStyle = '#fef08a';
+      ctx.fillRect(-3, -71, 6, 6);
+    }
+    ctx.restore();
+
+    // Orbital Spaceport Dome
+    const domeGrad = ctx.createRadialGradient(0, -95, 10, 0, -95, 52);
+    domeGrad.addColorStop(0, '#fef08a');
+    domeGrad.addColorStop(0.4, '#d97706');
+    domeGrad.addColorStop(0.85, '#78350f');
+    domeGrad.addColorStop(1, '#291105');
+
+    ctx.fillStyle = domeGrad;
+    ctx.strokeStyle = '#facc15';
+    ctx.lineWidth = 3.2;
+    ctx.beginPath();
+    ctx.arc(0, -95, 48, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Blue-Gold Plasma Coffee Cup Crest
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = 'bold 36px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('☕', 0, -95);
+
+    // Beaming Cosmic Espresso Beacon
+    const beamGrad = ctx.createLinearGradient(0, -145, 0, -320);
+    beamGrad.addColorStop(0, 'rgba(56, 189, 248, 0.85)');
+    beamGrad.addColorStop(0.6, 'rgba(250, 204, 21, 0.45)');
+    beamGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+    ctx.fillStyle = beamGrad;
+    ctx.beginPath();
+    ctx.moveTo(-16, -143);
+    ctx.lineTo(-45, -310);
+    ctx.lineTo(45, -310);
+    ctx.lineTo(16, -143);
+    ctx.closePath();
+    ctx.fill();
+
+    // Docking Portal Arch & Base Structure
+    ctx.fillStyle = '#1e1b4b';
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2.8;
+    ctx.beginPath();
+    ctx.roundRect(-54, -48, 108, 48, [12, 12, 0, 0]);
+    ctx.fill();
+    ctx.stroke();
+
+    // Portal Light Core
+    const portalGrad = ctx.createLinearGradient(0, -42, 0, 0);
+    portalGrad.addColorStop(0, '#facc15');
+    portalGrad.addColorStop(0.6, '#38bdf8');
+    portalGrad.addColorStop(1, '#1e1b4b');
+    ctx.fillStyle = portalGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, 32, Math.PI, 0);
+    ctx.fill();
+
+    ctx.fillStyle = '#fef08a';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('GALACTIC ORBITAL ROASTERY', 0, -165);
+
     ctx.restore();
   }
 
@@ -1453,6 +1832,161 @@ export class WorldRenderer {
     // Stem at top
     ctx.fillStyle = '#78350f';
     ctx.fillRect(-2, -19, 4, 4);
+
+    ctx.restore();
+  }
+
+  drawStarBean(star, cameraX, time) {
+    if (star.collected) return;
+    const sx = star.x - cameraX;
+    if (sx < -40 || sx > this.width + 40) return;
+    const ctx = this.ctx;
+    const bob = Math.sin(time * 4.2 + (star.x * 0.02)) * 5;
+
+    ctx.save();
+    ctx.translate(sx, star.y + bob);
+
+    // Glowing starlight aura
+    const aura = ctx.createRadialGradient(0, 0, 2, 0, 0, 24);
+    aura.addColorStop(0, 'rgba(56, 189, 248, 0.85)');
+    aura.addColorStop(0.5, 'rgba(250, 204, 21, 0.4)');
+    aura.addColorStop(1, 'rgba(56, 189, 248, 0)');
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(0, 0, 24, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 8-Pointed Starburst
+    ctx.save();
+    ctx.rotate(time * 1.6);
+    this.drawFourPointSparkle(0, 0, 11, '#38bdf8');
+    ctx.rotate(Math.PI / 4);
+    this.drawFourPointSparkle(0, 0, 8, '#fef08a');
+    ctx.restore();
+
+    // Glowing Golden Coffee Bean Core
+    ctx.fillStyle = '#fde047';
+    ctx.strokeStyle = '#78350f';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 7.5, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.strokeStyle = '#451a03';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-5, 0);
+    ctx.quadraticCurveTo(0, 2.5, 5, 0);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  drawCelestialOrb(orb, cameraX, time) {
+    if (orb.collected) return;
+    const sx = orb.x - cameraX;
+    if (sx < -50 || sx > this.width + 50) return;
+    const ctx = this.ctx;
+    const bob = Math.sin(time * 3.4 + (orb.x * 0.015)) * 6;
+
+    ctx.save();
+    ctx.translate(sx, orb.y + bob);
+
+    // Deep space aura
+    const aura = ctx.createRadialGradient(0, 0, 3, 0, 0, 32);
+    aura.addColorStop(0, 'rgba(192, 132, 252, 0.9)');
+    aura.addColorStop(0.55, 'rgba(56, 189, 248, 0.45)');
+    aura.addColorStop(1, 'rgba(192, 132, 252, 0)');
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(0, 0, 32, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Tilted planetary ring
+    ctx.save();
+    ctx.rotate(-0.35);
+    ctx.strokeStyle = 'rgba(250, 204, 21, 0.75)';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 20, 6, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    // Glass Orb Sphere with Swirling Galaxy Core
+    const orbGrad = ctx.createRadialGradient(-3, -3, 2, 0, 0, 13);
+    orbGrad.addColorStop(0, '#f5d0fe');
+    orbGrad.addColorStop(0.35, '#c084fc');
+    orbGrad.addColorStop(0.7, '#7e22ce');
+    orbGrad.addColorStop(1, '#3b0764');
+
+    ctx.fillStyle = orbGrad;
+    ctx.strokeStyle = '#fef08a';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(0, 0, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Specular glass shine
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.beginPath();
+    ctx.ellipse(-4, -4, 3, 2, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  drawCinnamonRing(ring, cameraX, time) {
+    const sx = ring.x - cameraX;
+    if (sx < -90 || sx > this.width + 90) return;
+    const ctx = this.ctx;
+    const pulse = ring.pulseTimer ? Math.sin(ring.pulseTimer * 10) * 8 : 0;
+    const r = ring.r + pulse;
+
+    ctx.save();
+    ctx.translate(sx, ring.y);
+
+    // Radiant outer speed aura
+    const aura = ctx.createRadialGradient(0, 0, r * 0.6, 0, 0, r * 1.5);
+    aura.addColorStop(0, 'rgba(250, 204, 21, 0.7)');
+    aura.addColorStop(0.5, 'rgba(249, 115, 22, 0.35)');
+    aura.addColorStop(1, 'rgba(250, 204, 21, 0)');
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Golden Cinnamon Ring Torus
+    ctx.strokeStyle = ring.triggered ? '#38bdf8' : '#f59e0b';
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = ring.triggered ? '#e0f2fe' : '#fef08a';
+    ctx.lineWidth = 3.5;
+    ctx.stroke();
+
+    // Cinnamon sparkles & rotating notches
+    ctx.save();
+    ctx.rotate(time * 2.2);
+    for (let i = 0; i < 8; i++) {
+      ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(-2, -r - 2, 4, 4);
+    }
+    ctx.restore();
+
+    // Floating speed arrow indicator in the center
+    ctx.fillStyle = ring.triggered ? '#38bdf8' : '#fde047';
+    ctx.beginPath();
+    ctx.moveTo(8, 0);
+    ctx.lineTo(-6, -8);
+    ctx.lineTo(-3, 0);
+    ctx.lineTo(-6, 8);
+    ctx.closePath();
+    ctx.fill();
 
     ctx.restore();
   }
@@ -1975,7 +2509,7 @@ export class WorldRenderer {
       ctx.fill();
       ctx.stroke();
       ctx.restore();
-    } else {
+    } else if (enemy.type !== 'steam_harpy') {
       // =========================================================================
       // 3. STEAM CLOUD SPIRIT (Exact match to Bottom Row of Enemy Character Sheet!)
       // Floating creamy-white wispy steam ghost with top curl crest, inner spiral
@@ -2088,6 +2622,72 @@ export class WorldRenderer {
       ctx.moveTo(0, 0);
       ctx.quadraticCurveTo(9, -3, 9, 3);
       ctx.quadraticCurveTo(7, 7, -1, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    } else {
+      // Celestial Winged Steam Harpy: Flapping latte-foam feathery wings, cute steam cloud body, goggles!
+      const outlineCol = '#4c1d95';
+      const wingFlap = Math.sin(phase * 1.8) * 0.7;
+
+      // Far wing
+      ctx.save();
+      ctx.translate(-8, -4);
+      ctx.rotate(-0.4 - wingFlap);
+      ctx.fillStyle = '#e0e7ff';
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.ellipse(0, -14, 8, 18, 0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      // Cloud Body
+      const bGrad = ctx.createRadialGradient(0, -2, 3, 0, 0, 22);
+      bGrad.addColorStop(0, '#ffffff');
+      bGrad.addColorStop(0.6, '#ede9fe');
+      bGrad.addColorStop(1, '#c4b5fd');
+      ctx.fillStyle = bGrad;
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.arc(0, 0, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Steampunk Aviator Goggles
+      ctx.fillStyle = '#f59e0b';
+      ctx.strokeStyle = '#291105';
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.arc(-5, -4, 5.5, 0, Math.PI * 2);
+      ctx.arc(6, -4, 5.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.arc(-5, -4, 3.2, 0, Math.PI * 2);
+      ctx.arc(6, -4, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Cute smile
+      ctx.strokeStyle = '#2e1065';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.arc(1, 4, 4, 0.2, Math.PI - 0.2);
+      ctx.stroke();
+
+      // Near wing
+      ctx.save();
+      ctx.translate(8, -2);
+      ctx.rotate(0.3 + wingFlap);
+      ctx.fillStyle = '#f5f3ff';
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.ellipse(0, -16, 9, 20, -0.25, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
       ctx.restore();
@@ -2270,6 +2870,9 @@ export class WorldRenderer {
     ctx.save();
     ctx.translate(hipShiftX, hipBobY);
 
+    // Draw Thruster Jetpack on the back of the cup (canisters, nozzles & rocket exhaust)
+    this.drawJetpackOnPlayer(ctx, player, sideMix, time);
+
     // Handle in FRONT VIEW (Sits on the side of the cup when sideMix is low)
     if (sideMix < 0.55) {
       ctx.save();
@@ -2339,6 +2942,9 @@ export class WorldRenderer {
     ctx.bezierCurveTo(-15, 19, -25, 11, -25, -16);
     ctx.closePath();
     ctx.stroke();
+
+    // Draw Jetpack Harness Straps & Bronze Buckle across the porcelain cup torso
+    this.drawJetpackHarness(ctx, player, sideMix);
 
     // --- 5. Thick Ceramic Top Rim, Bubbly Crema Foam & Dynamic Slosh-Reactive Splash Crown ---
     ctx.fillStyle = '#FFF6E8';
@@ -3606,6 +4212,256 @@ export class WorldRenderer {
     ctx.restore();
   }
 
+  drawJetpackPickupVisual(ctx, time) {
+    // Twin polished brass canisters with steam valve caps and nozzles
+    const canW = 12;
+    const canH = 28;
+    const offsets = [-7, 7];
+
+    offsets.forEach((cx) => {
+      ctx.save();
+      ctx.translate(cx, 0);
+
+      const canGrad = ctx.createLinearGradient(-canW / 2, 0, canW / 2, 0);
+      canGrad.addColorStop(0, '#78350f');
+      canGrad.addColorStop(0.3, '#d97706');
+      canGrad.addColorStop(0.6, '#fef08a');
+      canGrad.addColorStop(0.85, '#b45309');
+      canGrad.addColorStop(1, '#451a03');
+
+      ctx.fillStyle = canGrad;
+      ctx.strokeStyle = '#291105';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.roundRect(-canW / 2, -canH / 2, canW, canH, 5);
+      ctx.fill();
+      ctx.stroke();
+
+      // Top Dome Cap
+      ctx.fillStyle = '#fde047';
+      ctx.beginPath();
+      ctx.arc(0, -canH / 2, canW * 0.45, Math.PI, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Exhaust Nozzle
+      ctx.fillStyle = '#451a03';
+      ctx.beginPath();
+      ctx.moveTo(-canW * 0.45, canH / 2);
+      ctx.lineTo(-canW * 0.6, canH / 2 + 6);
+      ctx.lineTo(canW * 0.6, canH / 2 + 6);
+      ctx.lineTo(canW * 0.45, canH / 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Idling steam puffs
+      const puff = Math.sin(time * 6 + cx) * 2;
+      ctx.fillStyle = 'rgba(254, 243, 199, 0.7)';
+      ctx.beginPath();
+      ctx.arc(0, canH / 2 + 9 + puff, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    });
+
+    // Central Brass Boiler & Dial
+    ctx.fillStyle = '#b45309';
+    ctx.strokeStyle = '#291105';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.roundRect(-6, -8, 12, 16, 3);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#fef3c7';
+    ctx.beginPath();
+    ctx.arc(0, 0, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.strokeStyle = '#dc2626';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(time * 3) * 3.8, Math.sin(time * 3) * 3.8);
+    ctx.stroke();
+  }
+
+  drawJetpackOnPlayer(ctx, player, sideMix, time) {
+    if (!player.hasJetpack) return;
+
+    ctx.save();
+    // Position on the back of the cup (negative X is back)
+    const packX = -18 - sideMix * 4;
+    const packY = -2;
+
+    ctx.translate(packX, packY);
+
+    // Rocket Exhaust Flames (when active)
+    if (player.jetpackActive || (player.jetpackPower || 0) > 0.05) {
+      const pwr = player.jetpackPower || 1;
+      const flicker = 0.85 + Math.sin(time * 38) * 0.15;
+      const flameLen = (28 + Math.sin(time * 48) * 6) * pwr * flicker;
+      const flameW = (7 + Math.cos(time * 32) * 1.5) * pwr;
+
+      // Draw dual flames (one for each nozzle)
+      const nozzleOffsets = [-5, 5];
+      for (const nx of nozzleOffsets) {
+        ctx.save();
+        ctx.translate(nx, 16);
+
+        // Radiant thrust light bloom
+        const bloom = ctx.createRadialGradient(0, flameLen * 0.3, 2, 0, flameLen * 0.5, flameLen * 1.2);
+        bloom.addColorStop(0, 'rgba(254, 240, 138, 0.7)');
+        bloom.addColorStop(0.4, 'rgba(249, 115, 22, 0.35)');
+        bloom.addColorStop(1, 'rgba(239, 68, 68, 0)');
+        ctx.fillStyle = bloom;
+        ctx.beginPath();
+        ctx.ellipse(0, flameLen * 0.4, flameW * 2.2, flameLen * 0.8, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Outer crimson/orange flame plume
+        const flameGrad = ctx.createLinearGradient(0, 0, 0, flameLen);
+        flameGrad.addColorStop(0, '#ffffff');
+        flameGrad.addColorStop(0.2, '#fef08a');
+        flameGrad.addColorStop(0.55, '#f97316');
+        flameGrad.addColorStop(0.85, '#dc2626');
+        flameGrad.addColorStop(1, 'rgba(124, 45, 18, 0)');
+
+        ctx.fillStyle = flameGrad;
+        ctx.beginPath();
+        ctx.moveTo(-flameW * 0.5, 0);
+        ctx.quadraticCurveTo(-flameW * 0.8, flameLen * 0.45, 0, flameLen);
+        ctx.quadraticCurveTo(flameW * 0.8, flameLen * 0.45, flameW * 0.5, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        // Inner piercing white-hot core
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(-flameW * 0.25, 0);
+        ctx.quadraticCurveTo(-flameW * 0.35, flameLen * 0.3, 0, flameLen * 0.55);
+        ctx.quadraticCurveTo(flameW * 0.35, flameLen * 0.3, flameW * 0.25, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        // Shock diamonds (supersonic steam jet rings)
+        ctx.fillStyle = 'rgba(254, 249, 195, 0.9)';
+        for (let sd = 0; sd < 3; sd++) {
+          const sy = flameLen * (0.2 + sd * 0.24);
+          ctx.beginPath();
+          ctx.ellipse(0, sy, flameW * 0.32, 1.8, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.restore();
+      }
+    }
+
+    // Dual Polished Brass Espresso Canisters
+    const canisterWidth = 9;
+    const canisterHeight = 22;
+    const canisterOffsets = [-5, 5];
+
+    canisterOffsets.forEach((cx) => {
+      ctx.save();
+      ctx.translate(cx, 0);
+
+      // Main cylinder body gradient (burnished brass & polished gold)
+      const canGrad = ctx.createLinearGradient(-canisterWidth / 2, 0, canisterWidth / 2, 0);
+      canGrad.addColorStop(0, '#78350f');
+      canGrad.addColorStop(0.25, '#d97706');
+      canGrad.addColorStop(0.55, '#fef08a');
+      canGrad.addColorStop(0.85, '#b45309');
+      canGrad.addColorStop(1, '#451a03');
+
+      ctx.fillStyle = canGrad;
+      ctx.strokeStyle = '#291105';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.roundRect(-canisterWidth / 2, -canisterHeight / 2, canisterWidth, canisterHeight, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      // Top pressure valve cap (spherical brass dome)
+      ctx.fillStyle = '#fde047';
+      ctx.beginPath();
+      ctx.arc(0, -canisterHeight / 2, canisterWidth * 0.45, Math.PI, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Lower exhaust bell nozzle
+      ctx.fillStyle = '#451a03';
+      ctx.beginPath();
+      ctx.moveTo(-canisterWidth * 0.45, canisterHeight / 2);
+      ctx.lineTo(-canisterWidth * 0.55, canisterHeight / 2 + 5);
+      ctx.lineTo(canisterWidth * 0.55, canisterHeight / 2 + 5);
+      ctx.lineTo(canisterWidth * 0.45, canisterHeight / 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.restore();
+    });
+
+    // Central Steam Boiler Manifold & Mini Pressure Dial
+    ctx.fillStyle = '#92400e';
+    ctx.strokeStyle = '#291105';
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.roundRect(-5, -6, 10, 12, 2.5);
+    ctx.fill();
+    ctx.stroke();
+
+    // Round Brass Pressure Gauge Dial
+    ctx.fillStyle = '#fef3c7';
+    ctx.beginPath();
+    ctx.arc(0, 0, 4.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Dial needle
+    const fuelAngle = -Math.PI * 0.6 + ((player.jetpackFuel || 100) / 100) * (Math.PI * 1.2);
+    ctx.strokeStyle = '#dc2626';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(fuelAngle) * 3.2, Math.sin(fuelAngle) * 3.2);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  drawJetpackHarness(ctx, player, sideMix) {
+    if (!player.hasJetpack) return;
+    ctx.save();
+    // Leather harness straps wrapped securely around the porcelain cup torso
+    ctx.strokeStyle = '#451a03';
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(-22, -2);
+    ctx.quadraticCurveTo(0, 3, 20, -1);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#78350f';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(-22, -2);
+    ctx.quadraticCurveTo(0, 3, 20, -1);
+    ctx.stroke();
+
+    // Bronze buckle at center
+    ctx.fillStyle = '#fde047';
+    ctx.strokeStyle = '#291105';
+    ctx.lineWidth = 1.2;
+    ctx.fillRect(-2.5, 0, 5, 5);
+    ctx.strokeRect(-2.5, 0, 5, 5);
+    ctx.restore();
+  }
+
   drawWeaponPickup(pickup, cameraX, time) {
     if (pickup.collected) return;
     const sx = pickup.x - cameraX;
@@ -3619,10 +4475,15 @@ export class WorldRenderer {
     ctx.translate(sx, pickup.y + bob);
 
     const isDeagle = pickup.type === 'golden_deagle';
+    const isJetpack = pickup.type === 'thruster_jetpack';
 
     // Radiant collectible aura
     const aura = ctx.createRadialGradient(0, 0, 4, 0, 0, 36);
-    if (isDeagle) {
+    if (isJetpack) {
+      aura.addColorStop(0, 'rgba(56, 189, 248, 0.88)');
+      aura.addColorStop(0.55, 'rgba(250, 204, 21, 0.45)');
+      aura.addColorStop(1, 'rgba(56, 189, 248, 0)');
+    } else if (isDeagle) {
       aura.addColorStop(0, 'rgba(250, 204, 21, 0.85)');
       aura.addColorStop(0.55, 'rgba(245, 158, 11, 0.45)');
       aura.addColorStop(1, 'rgba(250, 204, 21, 0)');
@@ -3641,15 +4502,17 @@ export class WorldRenderer {
     ctx.rotate(time * 1.4);
     for (let i = 0; i < 4; i++) {
       ctx.rotate(Math.PI / 2);
-      this.drawFourPointSparkle(0, -24, 6, isDeagle ? '#fef08a' : '#fde047');
+      this.drawFourPointSparkle(0, -24, 6, isJetpack ? '#38bdf8' : isDeagle ? '#fef08a' : '#fde047');
     }
     ctx.restore();
 
-    // Floating 3D Gun Display
+    // Floating 3D Gun or Jetpack Display
     ctx.save();
     ctx.rotate(tilt);
-    ctx.scale(1.4, 1.4);
-    if (isDeagle) {
+    ctx.scale(1.35, 1.35);
+    if (isJetpack) {
+      this.drawJetpackPickupVisual(ctx, time);
+    } else if (isDeagle) {
       this.drawGoldenDesertEagle50(ctx, -10, 0, false, 0, time);
     } else {
       this.drawBlackGlock16mm(ctx, -10, 0, false, 0);
@@ -3658,16 +4521,16 @@ export class WorldRenderer {
 
     // Floating Label Pill
     ctx.fillStyle = 'rgba(17, 18, 22, 0.94)';
-    ctx.strokeStyle = isDeagle ? '#facc15' : '#f472b6';
+    ctx.strokeStyle = isJetpack ? '#38bdf8' : isDeagle ? '#facc15' : '#f472b6';
     ctx.lineWidth = 1.6;
     ctx.beginPath();
-    const labelText = isDeagle ? '★ GOLDEN DESERT EAGLE .50 ★' : '★ BLACK GLOCK 16mm ★';
-    const pillW = isDeagle ? 176 : 132;
+    const labelText = isJetpack ? '★ STEAM TURBO JETPACK ★' : isDeagle ? '★ GOLDEN DESERT EAGLE .50 ★' : '★ BLACK GLOCK 16mm ★';
+    const pillW = isJetpack ? 170 : isDeagle ? 176 : 132;
     ctx.roundRect(-pillW / 2, -38, pillW, 20, 9);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = isDeagle ? '#fef08a' : '#fde047';
+    ctx.fillStyle = isJetpack ? '#7dd3fc' : isDeagle ? '#fef08a' : '#fde047';
     ctx.font = 'bold 10px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(labelText, 0, -24);

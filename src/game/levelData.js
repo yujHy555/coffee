@@ -350,8 +350,221 @@ export function createLevel2Data() {
   };
 }
 
+// =============================================================================
+// LEVEL 3: CLOUDTOP STRATOSPHERE & CELESTIAL STAR-ROAST ORBIT
+// Features: Steam Turbo Jetpack, High-Altitude Flying, Floating Cinnamon Whipped
+// Clouds, Steampunk Victorian Airship Decks, Flying Cinnamon Rings, Star Beans,
+// Shimmering Celestial Cold Brew Orbs, and the Galactic Orbital Roastery Finish!
+// =============================================================================
+export function createLevel3Data() {
+  const platforms = [
+    // --- ZONE 1: CLOUDTOP CAPPUCCINO STRATOSPHERE ---
+    // Starting Victorian Airship Launch Deck (features the Steam Turbo Jetpack pickup!)
+    { x: 40, y: 480, w: 380, h: 56, type: 'airship_deck', zone: 1 },
+
+    // Floating Cinnamon-Dusted Whipped Foam Cloud Platforms
+    { x: 490, y: 410, w: 260, h: 48, type: 'cappuccino_cloud', zone: 1 },
+    { x: 820, y: 290, w: 230, h: 46, type: 'cappuccino_cloud', zone: 1 },
+
+    // Mid-air Victorian Brass Airship Barge #1
+    { x: 1140, y: 420, w: 320, h: 54, type: 'airship_deck', zone: 1 },
+
+    // High soaring cloud path for jetpack pilots
+    { x: 1380, y: 190, w: 240, h: 44, type: 'cappuccino_cloud', zone: 1 },
+
+    // Stratosphere Bouncy Marshmallow Launcher
+    { x: 1680, y: 470, w: 120, h: 36, type: 'marshmallow_pad', zone: 1 },
+
+    // High Cloud Observation Island
+    { x: 1820, y: 260, w: 220, h: 46, type: 'cappuccino_cloud', zone: 1 },
+
+    // Flagship Steampunk Airship Cruiser (equipped with a Golden Desert Eagle .50 for aerial gunplay!)
+    { x: 2120, y: 380, w: 460, h: 58, type: 'airship_deck', zone: 1 },
+
+    // Ascending flight clouds over the grand drop
+    { x: 2660, y: 430, w: 200, h: 46, type: 'cappuccino_cloud', zone: 1 },
+    { x: 2930, y: 320, w: 210, h: 46, type: 'cappuccino_cloud', zone: 1 },
+    { x: 3200, y: 220, w: 220, h: 46, type: 'cappuccino_cloud', zone: 1 },
+
+    // Mid-Level Gateway Checkpoint to Outer Space
+    { x: 3480, y: 450, w: 420, h: 62, type: 'airship_deck', zone: 2, isCheckpoint: true, checkpointName: 'Celestial Orbit Gateway' },
+
+    // --- ZONE 2: CELESTIAL STAR-ROAST ORBIT ---
+    // Cosmic Asteroid Platforms made of roasted meteorite bean rock
+    { x: 3980, y: 370, w: 280, h: 66, type: 'cosmic_rock', zone: 2 },
+
+    // Sparkling Starry Quartz Crystalline Asteroid
+    { x: 4340, y: 250, w: 260, h: 54, type: 'stellar_quartz', zone: 2 },
+
+    // High Zero-G Cosmic Outpost
+    { x: 4700, y: 160, w: 230, h: 58, type: 'cosmic_rock', zone: 2 },
+
+    // Lower Asteroid with Marshmallow Trampoline Launcher
+    { x: 4740, y: 480, w: 280, h: 64, type: 'cosmic_rock', zone: 2 },
+    { x: 5120, y: 470, w: 120, h: 36, type: 'marshmallow_pad', zone: 2 },
+
+    // High Orbit Starry Quartz Spire
+    { x: 5320, y: 290, w: 240, h: 52, type: 'stellar_quartz', zone: 2 },
+
+    // Wide Cosmic Asteroid Station
+    { x: 5740, y: 390, w: 380, h: 64, type: 'cosmic_rock', zone: 2 },
+
+    // Upper Atmospheric Starry Quartz Platform
+    { x: 6200, y: 240, w: 260, h: 54, type: 'stellar_quartz', zone: 2 },
+
+    // Floating Starlight Cloud Runway
+    { x: 6580, y: 360, w: 280, h: 48, type: 'cappuccino_cloud', zone: 2 },
+
+    // Grand Galactic Orbital Roastery Space Station Finish
+    { x: 6980, y: 420, w: 720, h: 96, type: 'airship_deck', zone: 2, isFinish: true }
+  ];
+
+  // Golden Coffee Beans distributed along aerial jetpack flight arcs
+  const beans = [];
+  const addArc = (centerX, baseY, width, height, count) => {
+    for (let i = 0; i < count; i++) {
+      const u = (i / (count - 1)) * 2 - 1;
+      const x = Math.round(centerX + u * (width * 0.5));
+      const y = Math.round(baseY - (1 - u * u) * height);
+      beans.push({ x, y, collected: false });
+    }
+  };
+
+  // Level 3 Bean Arcs
+  addArc(650, 360, 260, 75, 7);
+  addArc(980, 240, 240, 80, 7);
+  addArc(1500, 140, 260, 75, 7);
+  addArc(1950, 210, 240, 85, 7);
+  addArc(2350, 320, 320, 95, 9);
+  addArc(2800, 360, 260, 80, 7);
+  addArc(3060, 260, 240, 75, 7);
+  addArc(4160, 310, 280, 90, 8);
+  addArc(4520, 200, 260, 90, 7);
+  addArc(4920, 110, 240, 80, 7);
+  addArc(5530, 230, 300, 110, 8);
+  addArc(5980, 320, 340, 90, 8);
+  addArc(6390, 190, 280, 90, 7);
+  addArc(6780, 310, 260, 80, 7);
+
+  // EXCLUSIVE LEVEL 3 COLLECTIBLE #1: Stellar Star Coffee Beans (sparkling 8-pointed golden stars, +300 pts, +10% jetpack fuel)
+  const starBeans = [
+    { x: 310, y: 390, collected: false },
+    { x: 740, y: 320, collected: false },
+    { x: 1040, y: 210, collected: false },
+    { x: 1260, y: 330, collected: false },
+    { x: 1530, y: 120, collected: false },
+    { x: 1740, y: 380, collected: false },
+    { x: 2020, y: 180, collected: false },
+    { x: 2520, y: 300, collected: false },
+    { x: 2850, y: 230, collected: false },
+    { x: 3320, y: 160, collected: false },
+    { x: 3740, y: 360, collected: false },
+    { x: 4220, y: 170, collected: false },
+    { x: 4620, y: 120, collected: false },
+    { x: 5040, y: 80, collected: false },
+    { x: 5460, y: 180, collected: false },
+    { x: 5880, y: 280, collected: false },
+    { x: 6120, y: 160, collected: false },
+    { x: 6480, y: 130, collected: false },
+    { x: 6860, y: 260, collected: false }
+  ];
+
+  // EXCLUSIVE LEVEL 3 COLLECTIBLE #2: Shimmering Celestial Cold Brew Orbs (cosmic glass orbs, +600 pts, refills 100% jetpack fuel!)
+  const celestialOrbs = [
+    { x: 930, y: 190, collected: false },
+    { x: 1780, y: 170, collected: false },
+    { x: 2790, y: 230, collected: false },
+    { x: 4470, y: 150, collected: false },
+    { x: 5240, y: 190, collected: false },
+    { x: 6330, y: 140, collected: false }
+  ];
+
+  // EXCLUSIVE LEVEL 3 ELEMENT #3: Flying Cinnamon Speed Rings (giant glowing rings in the sky, flying through them gives a rush of speed + 300 pts!)
+  const cinnamonRings = [
+    { id: 'ring_1', x: 1040, y: 210, r: 36, triggered: false },
+    { id: 'ring_2', x: 1840, y: 180, r: 36, triggered: false },
+    { id: 'ring_3', x: 3100, y: 170, r: 38, triggered: false },
+    { id: 'ring_4', x: 4540, y: 190, r: 40, triggered: false },
+    { id: 'ring_5', x: 5480, y: 220, r: 40, triggered: false },
+    { id: 'ring_6', x: 6420, y: 180, r: 40, triggered: false }
+  ];
+
+  // Airborne Celestial Steam Harpies & Cosmic Spirits patrolling Level 3
+  const enemies = [
+    { id: 'l3_e1', type: 'sugar_hopper', x: 620, y: 390, minX: 520, maxX: 720, vx: 140, hp: 2, maxHp: 2 },
+    { id: 'l3_e2', type: 'steam_harpy', x: 990, y: 220, baseY: 220, minX: 860, maxX: 1100, vx: 110, hp: 2, maxHp: 2 },
+    { id: 'l3_e3', type: 'bean_grunt', x: 1280, y: 400, minX: 1180, maxX: 1400, vx: 90, hp: 2, maxHp: 2 },
+    { id: 'l3_e4', type: 'steam_harpy', x: 1720, y: 210, baseY: 210, minX: 1600, maxX: 1860, vx: -125, hp: 2, maxHp: 2 },
+    { id: 'l3_e5', type: 'sugar_hopper', x: 2340, y: 360, minX: 2180, maxX: 2500, vx: 160, hp: 2, maxHp: 2 },
+    { id: 'l3_e6', type: 'steam_harpy', x: 2840, y: 260, baseY: 260, minX: 2700, maxX: 3000, vx: 115, hp: 2, maxHp: 2 },
+    { id: 'l3_e7', type: 'steam_spirit', x: 3740, y: 360, baseY: 360, minX: 3580, maxX: 3880, vx: 95, hp: 2, maxHp: 2 },
+    { id: 'l3_e8', type: 'sugar_hopper', x: 4120, y: 350, minX: 4020, maxX: 4220, vx: 150, hp: 2, maxHp: 2 },
+    { id: 'l3_e9', type: 'steam_harpy', x: 4560, y: 180, baseY: 180, minX: 4400, maxX: 4720, vx: -130, hp: 2, maxHp: 2 },
+    { id: 'l3_e10', type: 'steam_spirit', x: 5040, y: 220, baseY: 220, minX: 4900, maxX: 5200, vx: 105, hp: 2, maxHp: 2 },
+    { id: 'l3_e11', type: 'sugar_hopper', x: 5920, y: 370, minX: 5780, maxX: 6080, vx: 170, hp: 2, maxHp: 2 },
+    { id: 'l3_e12', type: 'steam_harpy', x: 6420, y: 190, baseY: 190, minX: 6280, maxX: 6560, vx: 135, hp: 2, maxHp: 2 }
+  ];
+
+  // Products hidden in Level 3
+  const productNodes = [
+    { productId: 'golden-arabica-elixir', x: 1490, y: 140, collected: false },
+    { productId: 'artisan-silver-barista-spoon', x: 2360, y: 325, collected: false },
+    { productId: 'midnight-velvet-espresso', x: 4810, y: 110, collected: false },
+    { productId: 'sunset-biscotti-cold-brew', x: 6330, y: 190, collected: false }
+  ];
+
+  // JETPACK & WEAPON PICKUPS FOR LEVEL 3
+  const weaponPickups = [
+    {
+      id: 'jetpack-starter',
+      type: 'thruster_jetpack',
+      name: 'Steam Turbo Jetpack',
+      x: 270,
+      y: 432,
+      collected: false
+    },
+    {
+      id: 'golden-deagle-sky-arsenal',
+      type: 'golden_deagle',
+      name: 'Golden Desert Eagle .50',
+      x: 2180,
+      y: 332,
+      collected: false
+    },
+    {
+      id: 'jetpack-space-station',
+      type: 'thruster_jetpack',
+      name: 'Steam Turbo Jetpack',
+      x: 3660,
+      y: 402,
+      collected: false
+    }
+  ];
+
+  return {
+    levelIndex: 3,
+    title: 'Level 3: Cloudtop Stratosphere & Celestial Star-Roast Orbit',
+    zone1Name: 'Cloudtop Stratosphere',
+    zone2Name: 'Celestial Star-Roast Orbit',
+    width: 7800,
+    height: 640,
+    liquidLevel: 610,
+    platforms,
+    beans,
+    starBeans,
+    celestialOrbs,
+    cinnamonRings,
+    enemies,
+    productNodes,
+    weaponPickups
+  };
+}
+
 // Master Level Data factory
 export function createLevelData(levelIndex = 1) {
+  if (levelIndex === 3) {
+    return createLevel3Data();
+  }
   if (levelIndex === 2) {
     return createLevel2Data();
   }

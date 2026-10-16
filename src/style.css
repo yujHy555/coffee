@@ -385,6 +385,12 @@ body {
   border-color: #3b0764;
 }
 
+.level-select-btn.lvl3 {
+  background: linear-gradient(180deg, #0284c7 0%, #0369a1 100%);
+  border-color: #082f49;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.5);
+}
+
 /* Top-Right Score, Beans & Timer (Matches Image 1 Top-Right!) */
 .hud-right {
   display: flex;

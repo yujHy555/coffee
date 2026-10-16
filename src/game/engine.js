@@ -122,6 +122,10 @@ export class CoffeePlatformerEngine {
       weaponType: null, // 'glock_16mm' or 'golden_deagle'
       gunShootTimer: 0, // Recoil & shooting pose timer
       gunRecoilX: 0,
+      hasJetpack: false, // Steam Turbo Jetpack
+      jetpackFuel: 100, // 0 to 100 fuel bar
+      jetpackActive: false, // True while thrusting in mid-air
+      jetpackPower: 0, // Lerped 0 to 1 for visuals and sound
       dashTimer: 0,
       dashCooldown: 0,
       scaleX: 1,
@@ -156,6 +160,8 @@ export class CoffeePlatformerEngine {
     this.beanCount = 0;
     this.gemCount = 0;
     this.podCount = 0;
+    this.starBeanCount = 0;
+    this.celestialOrbCount = 0;
     this.score = 0;
     this.combo = 0;
     this.comboTimer = 0;
@@ -309,6 +315,34 @@ export class CoffeePlatformerEngine {
 
     if (plat.type === 'steam_vent') {
       return plat.y;
+    }
+
+    if (plat.type === 'cappuccino_cloud') {
+      const bob = Math.sin(time * 2.6 + plat.x * 0.02) * 3.5;
+      const crowned = (u * u) * 4;
+      return plat.y + bob + crowned;
+    }
+
+    if (plat.type === 'airship_deck') {
+      const bob = Math.sin(time * 1.8 + plat.x * 0.015) * 2;
+      return plat.y + bob;
+    }
+
+    if (plat.type === 'stellar_quartz') {
+      const edgeRadius = 14;
+      let edgeDrop = 0;
+      if (localX < edgeRadius) {
+        edgeDrop = ((edgeRadius - localX) / edgeRadius) * 6;
+      } else if (localX > plat.w - edgeRadius) {
+        edgeDrop = ((localX - (plat.w - edgeRadius)) / edgeRadius) * 6;
+      }
+      return plat.y + edgeDrop;
+    }
+
+    if (plat.type === 'cosmic_rock') {
+      const clampedU = Math.max(-0.96, Math.min(0.96, u));
+      const domeDrop = (1 - Math.sqrt(1 - clampedU * clampedU)) * (plat.h * 0.28);
+      return plat.y - 1 + domeDrop;
     }
 
     // Biscuit, Wafer, Chocolate Cookie, and Gingerbread platforms: flat top with smooth rounded corners at edges
@@ -766,6 +800,116 @@ export class CoffeePlatformerEngine {
       const gravityMult = isNearApex ? 0.68 : p.vy > 80 ? 1.18 : 1.0;
       p.vy += 1420 * gravityMult * dt;
       if (p.vy > 820) p.vy = 820;
+
+      // =========================================================================
+      // Thruster Jetpack Aerobatics & Flight Physics (Super-Satisfying Controls!)
+      // =========================================================================
+      const isThrustKey = this.keys.has('Space') || this.keys.has('KeyW') || this.keys.has('ArrowUp');
+      const canJetpack = p.hasJetpack && isThrustKey && !p.onGround && p.jetpackFuel > 0;
+
+      if (canJetpack) {
+        p.jetpackActive = true;
+        p.jetpackPower = Math.min(1, (p.jetpackPower || 0) + 9 * dt);
+
+        // Smooth fuel consumption (~4.5s continuous flight, fast regen)
+        p.jetpackFuel = Math.max(0, p.jetpackFuel - 22 * dt);
+
+        // Smooth, responsive upward thrust acceleration
+        p.vy -= 1840 * dt;
+
+        // Terminal vertical flight velocity clamp: fast and exhilarating, yet perfectly controllable!
+        if (p.vy < -520) p.vy = -520;
+
+        // Hover damping when feathering or reaching peak: gives exquisite acrobatic precision!
+        p.vy *= Math.pow(0.962, dt * 60);
+
+        // Refresh air jump so releasing allows an acrobatic flip!
+        p.jumpsRemaining = 1;
+
+        // Update audio synthesizer intensity
+        sound.startJetpackSound();
+        sound.updateJetpackSound(p.jetpackPower);
+
+        // Aerodynamic forward boost while jetpacking
+        const flightMaxSpeed = 430;
+        if (moveLeft) {
+          p.vx = Math.max(p.vx - 2900 * dt, -flightMaxSpeed);
+        } else if (moveRight) {
+          p.vx = Math.min(p.vx + 2900 * dt, flightMaxSpeed);
+        }
+
+        // Dynamic flight lean & micro-vibration
+        p.tiltAngle += (p.facing * 0.24 - p.tiltAngle) * Math.min(1, 14 * dt);
+        this.shakeTimer = 0.04;
+        this.shakeIntensity = 1.35;
+
+        // Spawn dual rocket exhaust particle streams (left nozzle & right nozzle on the back)
+        for (let nozzle = -1; nozzle <= 1; nozzle += 2) {
+          const nozX = p.x - p.facing * 14 + nozzle * 6;
+          const nozY = p.y + 12;
+
+          // Hot fiery core plasma particles
+          this.particles.push({
+            x: nozX + (Math.random() - 0.5) * 4,
+            y: nozY,
+            vx: -p.vx * 0.15 + (Math.random() - 0.5) * 40,
+            vy: 420 + Math.random() * 220,
+            r: 3 + Math.random() * 4,
+            color: Math.random() < 0.4 ? '#ffffff' : Math.random() < 0.75 ? '#fde047' : '#f97316',
+            life: 0.16 + Math.random() * 0.12,
+            maxLife: 0.28,
+            gravity: 120
+          });
+
+          // Billowing espresso steam clouds
+          if (Math.random() < 0.45) {
+            this.particles.push({
+              x: nozX + (Math.random() - 0.5) * 6,
+              y: nozY + 10,
+              vx: -p.vx * 0.1 + (Math.random() - 0.5) * 50,
+              vy: 240 + Math.random() * 140,
+              r: 5 + Math.random() * 7,
+              color: 'rgba(254, 243, 199, 0.5)',
+              life: 0.32 + Math.random() * 0.18,
+              maxLife: 0.5,
+              gravity: -40
+            });
+          }
+        }
+
+        // Check ground proximity blowback puffs
+        for (const plat of this.level.platforms) {
+          if (p.x >= plat.x - 20 && p.x <= plat.x + plat.w + 20) {
+            const surfY = this.getPlatformSurfaceY(plat, p.x, this.time);
+            const distToPlat = surfY - p.y;
+            if (distToPlat > 0 && distToPlat < 110) {
+              if (Math.random() < 0.5) {
+                this.particles.push({
+                  x: p.x + (Math.random() - 0.5) * 28,
+                  y: surfY - 2,
+                  vx: (Math.random() - 0.5) * 160,
+                  vy: -30 - Math.random() * 40,
+                  r: 3.5 + Math.random() * 5,
+                  color: 'rgba(253, 230, 138, 0.65)',
+                  life: 0.22,
+                  maxLife: 0.22,
+                  gravity: 20
+                });
+              }
+            }
+          }
+        }
+      } else {
+        if (p.jetpackActive) {
+          p.jetpackActive = false;
+          sound.stopJetpackSound();
+        }
+        p.jetpackPower = Math.max(0, (p.jetpackPower || 0) - 10 * dt);
+
+        // Quick Fuel Regeneration when coasting or walking
+        const fuelRegen = p.onGround ? 48 : 26;
+        p.jetpackFuel = Math.min(100, (p.jetpackFuel || 0) + fuelRegen * dt);
+      }
     } else if (Math.random() < 0.75) {
       // Frothy dash trail particles
       this.particles.push({
@@ -877,19 +1021,21 @@ export class CoffeePlatformerEngine {
           sound.playProductUnlock();
         }
 
-        // Grand Finish (Level 1 Roastery or Level 2 Celestial Observatory)
+        // Grand Finish (Level 1 Roastery, Level 2 Celestial Observatory, or Level 3 Galactic Orbital Station)
         if (plat.isFinish && !this.victoryTriggered) {
           this.victoryTriggered = true;
           sound.playProductUnlock();
           if (this.callbacks.onVictory) {
             this.callbacks.onVictory({
               level: this.currentLevel,
-              nextLevel: this.currentLevel === 1 ? 2 : null,
+              nextLevel: this.currentLevel === 1 ? 2 : this.currentLevel === 2 ? 3 : null,
               levelTitle: this.level.title,
               score: this.score,
               beans: this.beanCount,
               gems: this.gemCount || 0,
               pods: this.podCount || 0,
+              starBeans: this.starBeanCount || 0,
+              celestialOrbs: this.celestialOrbCount || 0,
               discoveredCount: this.discoveredProducts.size,
               time: Math.floor(this.elapsedSeconds)
             });
@@ -1104,26 +1250,107 @@ export class CoffeePlatformerEngine {
       }
     }
 
-    // Collect Weapon Pickups (Black Glock 16mm or Golden Desert Eagle .50)
+    // Collect Level 3 Stellar Star Coffee Beans (+300 pts, +14% jetpack fuel)
+    if (this.level.starBeans) {
+      for (const starBean of this.level.starBeans) {
+        if (starBean.collected) continue;
+        const dist = Math.hypot(p.x - starBean.x, p.y - starBean.y);
+        if (dist < p.r + 20) {
+          starBean.collected = true;
+          this.starBeanCount = (this.starBeanCount || 0) + 1;
+          this.score += 300;
+          p.jetpackFuel = Math.min(100, (p.jetpackFuel || 0) + 14);
+          p.caffeine = Math.min(100, p.caffeine + 10);
+          sound.playGemCollect();
+          this.spawnCoffeeSplash(starBean.x, starBean.y, 10, '#38bdf8');
+          this.addFloatingText(starBean.x, starBean.y - 16, '+300 STAR BEAN ⭐', '#7dd3fc');
+          this.syncHud();
+        }
+      }
+    }
+
+    // Collect Level 3 Shimmering Celestial Cold Brew Orbs (+600 pts, 100% full jetpack fuel!)
+    if (this.level.celestialOrbs) {
+      for (const orb of this.level.celestialOrbs) {
+        if (orb.collected) continue;
+        const dist = Math.hypot(p.x - orb.x, p.y - orb.y);
+        if (dist < p.r + 26) {
+          orb.collected = true;
+          this.celestialOrbCount = (this.celestialOrbCount || 0) + 1;
+          this.score += 600;
+          p.jetpackFuel = 100;
+          p.caffeine = 100;
+          sound.playProductUnlock();
+          this.spawnCoffeeSplash(orb.x, orb.y, 16, '#c084fc');
+          this.addFloatingText(orb.x, orb.y - 24, '+600 CELESTIAL COLD BREW! 🌌', '#e879f9');
+          this.syncHud();
+        }
+      }
+    }
+
+    // Fly through Flying Cinnamon Speed Rings
+    if (this.level.cinnamonRings) {
+      for (const ring of this.level.cinnamonRings) {
+        if (ring.pulseTimer > 0) ring.pulseTimer -= dt;
+        const dist = Math.hypot(p.x - ring.x, p.y - ring.y);
+        if (dist < ring.r + p.r * 0.7 && !ring.triggered) {
+          ring.triggered = true;
+          ring.pulseTimer = 0.6;
+          this.score += 300;
+          p.vx = p.facing * 560; // Aerodynamic speed burst through the ring!
+          p.vy = Math.min(p.vy, -160);
+          sound.playRingFlythrough();
+          this.addFloatingText(ring.x, ring.y - 32, '★ SPEED RING! +300 ★', '#facc15');
+          for (let a = 0; a < 14; a++) {
+            const ang = (a / 14) * Math.PI * 2;
+            this.particles.push({
+              x: ring.x + Math.cos(ang) * ring.r,
+              y: ring.y + Math.sin(ang) * ring.r,
+              vx: Math.cos(ang) * 140,
+              vy: Math.sin(ang) * 140,
+              r: 3 + Math.random() * 4,
+              color: Math.random() < 0.5 ? '#facc15' : '#fb923c',
+              life: 0.35,
+              maxLife: 0.35,
+              gravity: 40
+            });
+          }
+          this.syncHud();
+        }
+      }
+    }
+
+    // Collect Weapon & Jetpack Pickups
     if (this.level.weaponPickups) {
       for (const pickup of this.level.weaponPickups) {
         if (pickup.collected) continue;
         const dist = Math.hypot(p.x - pickup.x, p.y - pickup.y);
         if (dist < p.r + 34) {
           pickup.collected = true;
-          p.hasBeanGun = true;
-          p.weaponType = pickup.type || 'glock_16mm';
-          sound.playProductUnlock();
-          this.impulseScale(1.36, 0.74, 3.8);
 
-          if (p.weaponType === 'golden_deagle') {
-            this.addFloatingText(pickup.x, pickup.y - 38, '★ GOLDEN DESERT EAGLE .50! ★', '#facc15');
-            this.addFloatingText(pickup.x, pickup.y - 14, '[X] / [CLICK] TO FIRE HEAVY SLUG!', '#fef08a');
-            this.spawnPinkGooExplosion(pickup.x, pickup.y, 16, 200);
+          if (pickup.type === 'thruster_jetpack') {
+            p.hasJetpack = true;
+            p.jetpackFuel = 100;
+            sound.playJetpackPickup();
+            this.impulseScale(1.36, 0.74, 4.0);
+            this.addFloatingText(pickup.x, pickup.y - 42, '🚀 STEAM TURBO JETPACK! 🚀', '#38bdf8');
+            this.addFloatingText(pickup.x, pickup.y - 18, '[HOLD SPACE / W / TOUCH] TO FLY!', '#fef08a');
+            this.spawnPinkGooExplosion(pickup.x, pickup.y, 16, 220);
           } else {
-            this.addFloatingText(pickup.x, pickup.y - 36, '★ BLACK GLOCK 16mm EQUIPPED! ★', '#f472b6');
-            this.addFloatingText(pickup.x, pickup.y - 14, '[X] / [CLICK] TO SHOOT BEANS!', '#fde047');
-            this.spawnPinkGooExplosion(pickup.x, pickup.y, 14, 160);
+            p.hasBeanGun = true;
+            p.weaponType = pickup.type || 'glock_16mm';
+            sound.playProductUnlock();
+            this.impulseScale(1.36, 0.74, 3.8);
+
+            if (p.weaponType === 'golden_deagle') {
+              this.addFloatingText(pickup.x, pickup.y - 38, '★ GOLDEN DESERT EAGLE .50! ★', '#facc15');
+              this.addFloatingText(pickup.x, pickup.y - 14, '[X] / [CLICK] TO FIRE HEAVY SLUG!', '#fef08a');
+              this.spawnPinkGooExplosion(pickup.x, pickup.y, 16, 200);
+            } else {
+              this.addFloatingText(pickup.x, pickup.y - 36, '★ BLACK GLOCK 16mm EQUIPPED! ★', '#f472b6');
+              this.addFloatingText(pickup.x, pickup.y - 14, '[X] / [CLICK] TO SHOOT BEANS!', '#fde047');
+              this.spawnPinkGooExplosion(pickup.x, pickup.y, 14, 160);
+            }
           }
           this.syncHud();
         }
@@ -1308,6 +1535,30 @@ export class CoffeePlatformerEngine {
         const prevEnemyY = enemy.y;
         enemy.y += (targetY - enemy.y) * Math.min(1, 7.5 * dt);
         enemy.vy = (enemy.y - prevEnemyY) / Math.max(0.001, dt);
+      } else if (enemy.type === 'steam_harpy') {
+        // 4. CELESTIAL STEAM HARPY:
+        // Airborne feathery winged drone gliding across the upper stratosphere and swooping down
+        const swoopSpeed = Math.abs(enemy.vx) || 110;
+        enemy.x += enemy.vx * dt;
+        enemy.animPhase += dt * 11;
+
+        if (enemy.x < enemy.minX) {
+          enemy.x = enemy.minX;
+          enemy.vx = swoopSpeed;
+          this.impulseEnemyScale(enemy, 1.25, 0.8, 1.5);
+        } else if (enemy.x > enemy.maxX) {
+          enemy.x = enemy.maxX;
+          enemy.vx = -swoopSpeed;
+          this.impulseEnemyScale(enemy, 1.25, 0.8, 1.5);
+        }
+
+        const baseY = enemy.baseY !== undefined ? enemy.baseY : enemy.groundY;
+        const waveOffset = Math.sin(this.time * 4.4 + enemy.x * 0.02) * 26;
+        const playerPull = distToPlayer < 280 ? Math.max(-20, Math.min(38, (p.y - baseY) * 0.4)) : 0;
+        const targetY = baseY + waveOffset + playerPull;
+        const prevEnemyY = enemy.y;
+        enemy.y += (targetY - enemy.y) * Math.min(1, 8.5 * dt);
+        enemy.vy = (enemy.y - prevEnemyY) / Math.max(0.001, dt);
       }
 
       // Harmonic Spring-Damper Squash & Stretch + Dynamic Lean/Tilt for every enemy
@@ -1322,7 +1573,8 @@ export class CoffeePlatformerEngine {
       enemy.scaleX = Math.max(0.58, Math.min(1.48, enemy.scaleX + enemy.scaleVx * dt));
       enemy.scaleY = Math.max(0.58, Math.min(1.48, enemy.scaleY + enemy.scaleVy * dt));
 
-      const targetEnemyTilt = enemy.type === 'steam_spirit'
+      const isAirborneEnemy = enemy.type === 'steam_spirit' || enemy.type === 'steam_harpy';
+      const targetEnemyTilt = isAirborneEnemy
         ? Math.max(-0.24, Math.min(0.24, (enemy.vy * 0.0012) + 0.08))
         : !enemy.onGround
           ? Math.max(-0.22, Math.min(0.22, enemy.vy * 0.0005))
@@ -1473,10 +1725,19 @@ export class CoffeePlatformerEngine {
     this.cameraX += (targetCamX - this.cameraX) * 6.5 * dt;
 
     // Biome name update
-    const isLevel2 = this.currentLevel === 2;
-    const splitX = isLevel2 ? 3350 : 3250;
-    const zone1 = isLevel2 ? 'Neon Mocha Grotto' : 'Starry Espresso Hills';
-    const zone2 = isLevel2 ? 'Frothy Caramel Caldera' : 'Sunset Biscotti Grove';
+    const lvl = this.currentLevel;
+    let splitX = 3250;
+    let zone1 = 'Starry Espresso Hills';
+    let zone2 = 'Sunset Biscotti Grove';
+    if (lvl === 3) {
+      splitX = 3500;
+      zone1 = 'Cloudtop Stratosphere';
+      zone2 = 'Celestial Star-Roast Orbit';
+    } else if (lvl === 2) {
+      splitX = 3350;
+      zone1 = 'Neon Mocha Grotto';
+      zone2 = 'Frothy Caramel Caldera';
+    }
     const newBiome = p.x < splitX ? zone1 : zone2;
     if (newBiome !== this.currentBiome) {
       this.currentBiome = newBiome;
@@ -1495,6 +1756,11 @@ export class CoffeePlatformerEngine {
       beans: this.beanCount,
       gems: this.gemCount || 0,
       pods: this.podCount || 0,
+      starBeans: this.starBeanCount || 0,
+      celestialOrbs: this.celestialOrbCount || 0,
+      hasJetpack: this.player.hasJetpack,
+      jetpackFuel: Math.round(this.player.jetpackFuel || 0),
+      jetpackActive: this.player.jetpackActive,
       score: this.score,
       biome: this.currentBiome,
       discoveredCount: this.discoveredProducts.size,
@@ -1531,7 +1797,7 @@ export class CoffeePlatformerEngine {
     // 4. Persistent Pink Goo Splats on Platforms
     this.renderer.drawPinkGooSplats(this.pinkGooSplats, camX);
 
-    // 5. Weapon Pickups (Black Glock 16mm or Golden Desert Eagle .50)
+    // 5. Weapon Pickups (Black Glock 16mm, Golden Desert Eagle .50, or Steam Turbo Jetpack)
     if (this.level.weaponPickups) {
       for (const pickup of this.level.weaponPickups) {
         this.renderer.drawWeaponPickup(pickup, camX, this.time);
@@ -1554,6 +1820,27 @@ export class CoffeePlatformerEngine {
     if (this.level.cacaoPods) {
       for (const pod of this.level.cacaoPods) {
         this.renderer.drawCacaoPod(pod, camX, this.time);
+      }
+    }
+
+    // 6d. Flying Cinnamon Speed Rings (Level 3)
+    if (this.level.cinnamonRings) {
+      for (const ring of this.level.cinnamonRings) {
+        this.renderer.drawCinnamonRing(ring, camX, this.time);
+      }
+    }
+
+    // 6e. Collectible Stellar Star Beans (Level 3)
+    if (this.level.starBeans) {
+      for (const star of this.level.starBeans) {
+        this.renderer.drawStarBean(star, camX, this.time);
+      }
+    }
+
+    // 6f. Collectible Shimmering Celestial Orbs (Level 3)
+    if (this.level.celestialOrbs) {
+      for (const orb of this.level.celestialOrbs) {
+        this.renderer.drawCelestialOrb(orb, camX, this.time);
       }
     }
 
