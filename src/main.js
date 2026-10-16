@@ -10,12 +10,20 @@ const hudBeans = document.getElementById('hud-beans');
 const hudScore = document.getElementById('hud-score');
 const hudTimer = document.getElementById('hud-timer');
 const hudProductsCount = document.getElementById('hud-products-count');
+const hudLevelBadge = document.getElementById('hud-level-badge');
+const levelSelectBtn = document.getElementById('level-select-btn');
+const hudGemsRow = document.getElementById('hud-gems-row');
+const hudGems = document.getElementById('hud-gems');
 
 // Modals
 const productModal = document.getElementById('product-modal');
 const vaultModal = document.getElementById('vault-modal');
 const victoryModal = document.getElementById('victory-modal');
 const vaultGrid = document.getElementById('vault-grid');
+const victoryBadge = document.getElementById('victory-badge');
+const victoryTitle = document.getElementById('victory-title');
+const victoryDesc = document.getElementById('victory-desc');
+const victoryNextBtn = document.getElementById('victory-next-btn');
 
 const touchShotBtn = document.getElementById('touch-shot-btn');
 const hintShot = document.getElementById('hint-shot');
@@ -31,7 +39,11 @@ const engine = new CoffeePlatformerEngine(canvas, {
       heartsHtml += `<span class="heart active" title="Nitro Foam Shield Active" style="color:#f472b6">🛡</span>`;
     }
     if (state.hasBeanGun) {
-      heartsHtml += `<span class="heart active" title="Black Glock 16mm Equipped" style="color:#fde047; text-shadow: 0 0 8px rgba(253, 224, 71, 0.8)">🔫</span>`;
+      if (state.weaponType === 'golden_deagle') {
+        heartsHtml += `<span class="heart active" title="Golden Desert Eagle .50 Equipped" style="color:#facc15; text-shadow: 0 0 10px rgba(250, 204, 21, 0.9)">🦅</span>`;
+      } else {
+        heartsHtml += `<span class="heart active" title="Black Glock 16mm Equipped" style="color:#fde047; text-shadow: 0 0 8px rgba(253, 224, 71, 0.8)">🔫</span>`;
+      }
     }
     hudHearts.innerHTML = heartsHtml;
 
@@ -41,14 +53,50 @@ const engine = new CoffeePlatformerEngine(canvas, {
     hudScore.textContent = String(state.score).padStart(6, '0').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     hudProductsCount.textContent = `${state.discoveredCount} / ${state.totalProducts}`;
 
+    // Update Level Indicator Badge & Switcher Button
+    if (hudLevelBadge) {
+      hudLevelBadge.textContent = state.level === 2 ? 'LVL 2: GROTTO' : 'LVL 1: ESPRESSO';
+    }
+    if (levelSelectBtn) {
+      if (state.level === 2) {
+        levelSelectBtn.classList.add('lvl2');
+      } else {
+        levelSelectBtn.classList.remove('lvl2');
+      }
+    }
+
+    // Sugar Gems counter for Level 2
+    if (hudGemsRow && hudGems) {
+      if (state.level === 2) {
+        hudGemsRow.style.display = 'flex';
+        hudGems.textContent = state.gems;
+      } else {
+        hudGemsRow.style.display = 'none';
+      }
+    }
+
+    // Weapon Action Buttons & Controls Bar Hints
     if (touchShotBtn && state.hasBeanGun) {
-      touchShotBtn.innerHTML = '🔫 Glock 16mm';
-      touchShotBtn.style.background = 'linear-gradient(135deg, #27272a, #09090b)';
-      touchShotBtn.style.borderColor = '#71717a';
+      if (state.weaponType === 'golden_deagle') {
+        touchShotBtn.innerHTML = '🦅 Deagle .50';
+        touchShotBtn.style.background = 'linear-gradient(135deg, #ca8a04, #78350f)';
+        touchShotBtn.style.borderColor = '#facc15';
+        touchShotBtn.style.color = '#fef08a';
+      } else {
+        touchShotBtn.innerHTML = '🔫 Glock 16mm';
+        touchShotBtn.style.background = 'linear-gradient(135deg, #27272a, #09090b)';
+        touchShotBtn.style.borderColor = '#71717a';
+        touchShotBtn.style.color = '#fff';
+      }
     }
     if (hintShot && state.hasBeanGun) {
-      hintShot.innerHTML = '<kbd>X</kbd> / <kbd>Click</kbd> Glock 16mm 🔫';
-      hintShot.style.color = '#fde047';
+      if (state.weaponType === 'golden_deagle') {
+        hintShot.innerHTML = '<kbd>X</kbd> / <kbd>Click</kbd> Golden Deagle .50 🦅';
+        hintShot.style.color = '#facc15';
+      } else {
+        hintShot.innerHTML = '<kbd>X</kbd> / <kbd>Click</kbd> Glock 16mm 🔫';
+        hintShot.style.color = '#fde047';
+      }
     }
   },
   onProductDiscovered: (product) => {
@@ -140,6 +188,39 @@ function showVictoryModal(stats) {
   engine.paused = true;
   const mins = String(Math.floor(stats.time / 60)).padStart(2, '0');
   const secs = String(stats.time % 60).padStart(2, '0');
+
+  if (stats.level === 1) {
+    if (victoryBadge) victoryBadge.textContent = '☕ LEVEL 1 CLEARED! ☕';
+    if (victoryTitle) victoryTitle.textContent = 'You Reached the Golden Roastery Sanctuary!';
+    if (victoryDesc) victoryDesc.textContent = 'Your espresso journey has unlocked the subterranean Neon Mocha Grotto & Caramel Caldera!';
+    if (victoryNextBtn) {
+      victoryNextBtn.style.display = 'inline-block';
+      victoryNextBtn.textContent = 'Proceed to Level 2: Neon Grotto ➔';
+    }
+  } else {
+    if (victoryBadge) victoryBadge.textContent = '🏆 MASTER BARISTA CHAMPION 🏆';
+    if (victoryTitle) victoryTitle.textContent = 'You Conquered the Frothy Caramel Caldera!';
+    if (victoryDesc) victoryDesc.textContent = 'You have mastered both coffee realms with legendary roasted agility and firepower!';
+    if (victoryNextBtn) {
+      victoryNextBtn.style.display = 'inline-block';
+      victoryNextBtn.textContent = 'Replay Level 1 ↺';
+    }
+  }
+
+  let extraStats = '';
+  if (stats.level === 2) {
+    extraStats = `
+      <div class="stat-box">
+        <strong>${stats.gems}</strong>
+        <span>SUGAR GEMS</span>
+      </div>
+      <div class="stat-box">
+        <strong>${stats.pods}</strong>
+        <span>CACAO PODS</span>
+      </div>
+    `;
+  }
+
   document.getElementById('victory-stats').innerHTML = `
     <div class="stat-box">
       <strong>${stats.score.toLocaleString()}</strong>
@@ -149,12 +230,21 @@ function showVictoryModal(stats) {
       <strong>${stats.beans}</strong>
       <span>GOLDEN BEANS</span>
     </div>
+    ${extraStats}
     <div class="stat-box">
       <strong>${stats.discoveredCount} / ${PRODUCTS.length}</strong>
       <span>PRODUCTS (${mins}:${secs})</span>
     </div>
   `;
   victoryModal.classList.remove('hidden');
+}
+
+// Level Switcher Quick Action
+if (levelSelectBtn) {
+  levelSelectBtn.addEventListener('click', () => {
+    const nextLvl = engine.currentLevel === 1 ? 2 : 1;
+    engine.loadLevel(nextLvl);
+  });
 }
 
 // Modal Buttons
@@ -179,6 +269,17 @@ document.getElementById('victory-vault-btn').addEventListener('click', () => {
   renderVaultCatalog();
   vaultModal.classList.remove('hidden');
 });
+
+if (victoryNextBtn) {
+  victoryNextBtn.addEventListener('click', () => {
+    victoryModal.classList.add('hidden');
+    if (engine.currentLevel === 1) {
+      engine.loadLevel(2);
+    } else {
+      engine.loadLevel(1);
+    }
+  });
+}
 
 document.getElementById('victory-replay-btn').addEventListener('click', () => {
   victoryModal.classList.add('hidden');

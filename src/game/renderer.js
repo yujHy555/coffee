@@ -17,6 +17,11 @@ export class WorldRenderer {
       phase: i * 0.7,
       isCross: i % 11 === 0
     }));
+    this.currentLevel = 1;
+  }
+
+  setLevel(levelIndex) {
+    this.currentLevel = levelIndex;
   }
 
   resize(width, height, scale = 1) {
@@ -44,6 +49,63 @@ export class WorldRenderer {
   drawSkyAndClouds(cameraX, time) {
     const ctx = this.ctx;
     const blend = this.getBiomeBlend(cameraX);
+
+    if (this.currentLevel === 2) {
+      // Level 2 Sky Gradient: Neon Mocha Grotto (deep obsidian/amethyst violet) -> Frothy Caramel Caldera (fiery sunset amber/caramel)
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, this.height * 0.85);
+      skyGrad.addColorStop(0, this.lerpColor('#0c0714', '#2d0f04', blend));
+      skyGrad.addColorStop(0.32, this.lerpColor('#1d0e2e', '#5b1d09', blend));
+      skyGrad.addColorStop(0.64, this.lerpColor('#3b0764', '#9a3412', blend));
+      skyGrad.addColorStop(0.88, this.lerpColor('#701a75', '#c2410c', blend));
+      skyGrad.addColorStop(1, this.lerpColor('#2e1022', '#f59e0b', blend));
+
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, this.width, this.height);
+
+      // Glowing subterranean crystals and star nebulas
+      ctx.save();
+      this.stars.forEach((s) => {
+        const sx = ((s.x - cameraX * 0.05) % this.width + this.width) % this.width;
+        const twinkle = 0.4 + 0.6 * Math.sin(time * 3.2 + s.phase);
+        ctx.fillStyle = s.isCross ? `rgba(244, 114, 182, ${twinkle * 0.9})` : `rgba(192, 132, 252, ${twinkle * 0.75})`;
+        ctx.beginPath();
+        ctx.arc(sx, s.y, s.r * 1.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (s.isCross && twinkle > 0.6) {
+          this.drawFourPointSparkle(sx, s.y, s.r * 4.5, `rgba(250, 204, 21, ${twinkle})`);
+        }
+      });
+
+      // Cavern ceiling stalactites in Zone 1
+      if (blend < 0.85) {
+        const stalactiteAlpha = 1 - blend;
+        ctx.globalAlpha = stalactiteAlpha;
+        for (let i = 0; i < 9; i++) {
+          const stX = ((i * 220 - cameraX * 0.1) % (this.width + 300) + (this.width + 300)) % (this.width + 300) - 100;
+          const stH = 35 + ((i * 29) % 55);
+          ctx.fillStyle = '#170b22';
+          ctx.beginPath();
+          ctx.moveTo(stX - 18, 0);
+          ctx.lineTo(stX + 18, 0);
+          ctx.lineTo(stX, stH);
+          ctx.closePath();
+          ctx.fill();
+
+          // Glowing amethyst crystal tip
+          ctx.fillStyle = '#c084fc';
+          ctx.beginPath();
+          ctx.moveTo(stX - 6, stH - 12);
+          ctx.lineTo(stX + 6, stH - 12);
+          ctx.lineTo(stX, stH + 8);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      }
+      ctx.restore();
+      return;
+    }
 
     // Rich Painterly Sky Gradient (Matches Reference Image 1 Deep Indigo -> Slate Blue -> Teal-Cyan -> Warm Horizon Glow)
     const skyGrad = ctx.createLinearGradient(0, 0, 0, this.height * 0.85);
@@ -952,10 +1014,241 @@ export class WorldRenderer {
       }
 
       if (p.isFinish) {
-        this.drawFinishSanctuary(p.w * 0.55, 0, time);
+        if (this.currentLevel === 2) {
+          this.drawObservatoryFinish(p.w * 0.55, 0, time);
+        } else {
+          this.drawFinishSanctuary(p.w * 0.55, 0, time);
+        }
       }
+    } else if (p.type === 'obsidian_rock') {
+      // Obsidian Basalt Shelf with glowing magma/mocha veins
+      const grad = ctx.createLinearGradient(0, 0, 0, p.h);
+      grad.addColorStop(0, '#2d1b2e');
+      grad.addColorStop(0.4, '#1b1322');
+      grad.addColorStop(1, '#0f0a14');
+
+      ctx.fillStyle = grad;
+      ctx.strokeStyle = '#09050d';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(0, 0, p.w, p.h, 14);
+      ctx.fill();
+      ctx.stroke();
+
+      // Glowing amethyst/mocha vein along top rim
+      ctx.strokeStyle = '#c084fc';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(8, 5);
+      ctx.lineTo(p.w - 8, 5);
+      ctx.stroke();
+
+      // Craggy crystalline facets
+      ctx.strokeStyle = '#581c87';
+      ctx.lineWidth = 1.4;
+      for (let vx = 24; vx < p.w - 20; vx += 36) {
+        ctx.beginPath();
+        ctx.moveTo(vx, 10);
+        ctx.lineTo(vx + 14, p.h * 0.65);
+        ctx.stroke();
+      }
+
+      if (p.isCheckpoint) {
+        ctx.fillStyle = '#c084fc';
+        ctx.fillRect(p.w - 55, -62, 6, 62);
+        ctx.fillStyle = '#e879f9';
+        ctx.beginPath();
+        ctx.moveTo(p.w - 49, -62);
+        ctx.lineTo(p.w - 12, -46);
+        ctx.lineTo(p.w - 49, -30);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      if (p.isFinish) {
+        this.drawObservatoryFinish(p.w * 0.55, 0, time);
+      }
+    } else if (p.type === 'amethyst_crystal') {
+      // Faceted Glowing Amethyst Sugar Crystal Cluster Platform
+      const grad = ctx.createLinearGradient(0, 0, 0, p.h);
+      grad.addColorStop(0, '#c084fc');
+      grad.addColorStop(0.35, '#9333ea');
+      grad.addColorStop(1, '#581c87');
+
+      ctx.fillStyle = grad;
+      ctx.strokeStyle = '#3b0764';
+      ctx.lineWidth = 2.8;
+      ctx.beginPath();
+      ctx.roundRect(0, 0, p.w, p.h, [14, 14, 8, 8]);
+      ctx.fill();
+      ctx.stroke();
+
+      // Faceted prismatic crystal spikes protruding along the sides
+      ctx.fillStyle = '#e879f9';
+      for (let cx = 12; cx < p.w - 16; cx += 28) {
+        ctx.beginPath();
+        ctx.moveTo(cx, 0);
+        ctx.lineTo(cx + 12, -8);
+        ctx.lineTo(cx + 24, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      // Bright specular crystalline glints
+      for (let i = 0; i < 8; i++) {
+        const gx = 10 + ((i * 27) % (p.w - 20));
+        const gy = 12 + ((i * 15) % (p.h - 18));
+        ctx.fillStyle = i % 2 === 0 ? '#ffffff' : '#f5d0fe';
+        ctx.fillRect(gx, gy, 2.5, 2.5);
+      }
+    } else if (p.type === 'wafer_ledge') {
+      // Crispy Chocolate & Vanilla Layered Wafer Platform
+      ctx.fillStyle = '#3f1d0b';
+      ctx.strokeStyle = '#1b0a03';
+      ctx.lineWidth = 2.6;
+      ctx.beginPath();
+      ctx.roundRect(2, p.h * 0.65, p.w - 4, p.h * 0.35, 6);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#fef08a';
+      ctx.fillRect(4, p.h * 0.45, p.w - 8, p.h * 0.22);
+
+      const wGrad = ctx.createLinearGradient(0, 0, 0, p.h * 0.5);
+      wGrad.addColorStop(0, '#fde68a');
+      wGrad.addColorStop(1, '#d97706');
+      ctx.fillStyle = wGrad;
+      ctx.beginPath();
+      ctx.roundRect(0, 0, p.w, p.h * 0.48, 8);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.strokeStyle = '#92400e';
+      ctx.lineWidth = 1.3;
+      for (let wx = 12; wx < p.w - 10; wx += 16) {
+        ctx.beginPath();
+        ctx.moveTo(wx, 2);
+        ctx.lineTo(wx, p.h * 0.44);
+        ctx.stroke();
+      }
+    } else if (p.type === 'marshmallow_pad') {
+      // NEW ELEMENT: Bouncy Toasted Marshmallow Trampoline Pad
+      const squash = p.squashTimer ? Math.sin(p.squashTimer * 12) * 8 : 0;
+      const padY = squash;
+      const padH = p.h - squash;
+
+      const mGrad = ctx.createLinearGradient(0, padY, 0, padY + padH);
+      mGrad.addColorStop(0, '#fff1f2');
+      mGrad.addColorStop(0.35, '#fce7f3');
+      mGrad.addColorStop(0.8, '#fbcfe8');
+      mGrad.addColorStop(1, '#b45309');
+
+      ctx.fillStyle = mGrad;
+      ctx.strokeStyle = '#831843';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(0, padY, p.w, padH, 20);
+      ctx.fill();
+      ctx.stroke();
+
+      // Toasted crust spots
+      ctx.fillStyle = '#d97706';
+      ctx.beginPath();
+      ctx.ellipse(p.w * 0.25, padY + 6, 14, 4, 0, 0, Math.PI * 2);
+      ctx.ellipse(p.w * 0.72, padY + 7, 16, 5, 0.1, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Trampoline spring arrow icon
+      ctx.fillStyle = '#be185d';
+      ctx.beginPath();
+      const cx = p.w * 0.5;
+      const cy = padY + padH * 0.55;
+      ctx.moveTo(cx, cy - 8);
+      ctx.lineTo(cx + 8, cy);
+      ctx.lineTo(cx + 3, cy);
+      ctx.lineTo(cx + 3, cy + 8);
+      ctx.lineTo(cx - 3, cy + 8);
+      ctx.lineTo(cx - 3, cy);
+      ctx.lineTo(cx - 8, cy);
+      ctx.closePath();
+      ctx.fill();
+    } else if (p.type === 'steam_vent') {
+      // NEW ELEMENT: High-Pressure Espresso Steam Geyser Vent
+      ctx.fillStyle = '#475569';
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 2.6;
+      ctx.beginPath();
+      ctx.roundRect(0, 0, p.w, p.h, 6);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#1e293b';
+      for (let vx = 10; vx < p.w - 10; vx += 12) {
+        ctx.fillRect(vx, 3, 6, p.h - 6);
+      }
+
+      // Billowing upward steam column
+      ctx.save();
+      const steamAlpha = 0.45 + Math.sin(time * 6) * 0.15;
+      const steamGrad = ctx.createLinearGradient(0, p.h, 0, -180);
+      steamGrad.addColorStop(0, `rgba(255, 255, 255, ${steamAlpha * 0.8})`);
+      steamGrad.addColorStop(0.5, `rgba(254, 240, 138, ${steamAlpha * 0.4})`);
+      steamGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+      ctx.fillStyle = steamGrad;
+      ctx.beginPath();
+      ctx.moveTo(4, 0);
+      ctx.lineTo(p.w - 4, 0);
+      ctx.lineTo(p.w + 16, -180);
+      ctx.lineTo(-16, -180);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
     }
 
+    ctx.restore();
+  }
+
+  drawObservatoryFinish(x, y, time) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(x, y);
+
+    // Celestial Espresso Observatory Finish (Level 2)
+    ctx.fillStyle = '#1e1b4b';
+    ctx.strokeStyle = '#facc15';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.roundRect(-80, -180, 160, 180, 18);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.save();
+    ctx.translate(0, -110);
+    ctx.rotate(time * 1.5);
+    ctx.strokeStyle = '#fde047';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, 36, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#f472b6';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 36, 14, 0.4, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(0, -110, 12 + Math.sin(time * 5) * 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#fde047';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('CELESTIAL OBSERVATORY', 0, -192);
     ctx.restore();
   }
 
@@ -1036,6 +1329,130 @@ export class WorldRenderer {
     ctx.beginPath();
     ctx.ellipse(-4, -5, 2.5, 5, 0.25, 0, Math.PI * 2);
     ctx.fill();
+
+    ctx.restore();
+  }
+
+  drawSugarGem(gem, cameraX, time) {
+    if (gem.collected) return;
+    const sx = gem.x - cameraX;
+    if (sx < -40 || sx > this.width + 40) return;
+
+    const ctx = this.ctx;
+    const bob = Math.sin(time * 4.5 + gem.bobOffset) * 6;
+    const spin = time * 2.2 + gem.bobOffset;
+
+    ctx.save();
+    ctx.translate(sx, gem.y + bob);
+
+    // Amethyst crystalline aura
+    const aura = ctx.createRadialGradient(0, 0, 2, 0, 0, 24);
+    aura.addColorStop(0, 'rgba(232, 121, 249, 0.85)');
+    aura.addColorStop(0.5, 'rgba(168, 85, 247, 0.35)');
+    aura.addColorStop(1, 'rgba(168, 85, 247, 0)');
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(0, 0, 24, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Diamond faceted Sugar Gem
+    ctx.save();
+    ctx.rotate(Math.sin(spin) * 0.15);
+    ctx.fillStyle = '#c084fc';
+    ctx.strokeStyle = '#581c87';
+    ctx.lineWidth = 2.2;
+    ctx.lineJoin = 'round';
+
+    // Top pyramid facets
+    ctx.beginPath();
+    ctx.moveTo(0, -14);
+    ctx.lineTo(10, -3);
+    ctx.lineTo(0, 14);
+    ctx.lineTo(-10, -3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Highlight facet
+    ctx.fillStyle = '#f5d0fe';
+    ctx.beginPath();
+    ctx.moveTo(0, -14);
+    ctx.lineTo(-10, -3);
+    ctx.lineTo(0, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    // Front facet
+    ctx.fillStyle = '#e879f9';
+    ctx.beginPath();
+    ctx.moveTo(0, -14);
+    ctx.lineTo(10, -3);
+    ctx.lineTo(0, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    // Catchlight
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(-2, -5, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+
+    this.drawFourPointSparkle(Math.sin(time * 3 + gem.bobOffset) * 10, -10, 4.5, '#ffffff');
+    ctx.restore();
+  }
+
+  drawCacaoPod(pod, cameraX, time) {
+    if (pod.collected) return;
+    const sx = pod.x - cameraX;
+    if (sx < -40 || sx > this.width + 40) return;
+
+    const ctx = this.ctx;
+    const bob = Math.sin(time * 3.8 + pod.bobOffset) * 6;
+    const tilt = Math.sin(time * 2.1 + pod.bobOffset) * 0.22;
+
+    ctx.save();
+    ctx.translate(sx, pod.y + bob);
+    ctx.rotate(tilt);
+
+    // Warm golden-chocolate aura
+    const aura = ctx.createRadialGradient(0, 0, 4, 0, 0, 28);
+    aura.addColorStop(0, 'rgba(251, 191, 36, 0.8)');
+    aura.addColorStop(0.55, 'rgba(180, 83, 9, 0.35)');
+    aura.addColorStop(1, 'rgba(180, 83, 9, 0)');
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(0, 0, 28, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Roasted Cacao Pod Silhouette
+    const grad = ctx.createLinearGradient(-10, -14, 10, 14);
+    grad.addColorStop(0, '#f59e0b');
+    grad.addColorStop(0.35, '#b45309');
+    grad.addColorStop(1, '#451a03');
+
+    ctx.fillStyle = grad;
+    ctx.strokeStyle = '#291105';
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 12, 17, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Fluted longitudinal ridges of the cacao pod
+    ctx.strokeStyle = '#fde68a';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(0, -16);
+    ctx.quadraticCurveTo(-7, 0, 0, 16);
+    ctx.moveTo(0, -16);
+    ctx.quadraticCurveTo(7, 0, 0, 16);
+    ctx.stroke();
+
+    // Stem at top
+    ctx.fillStyle = '#78350f';
+    ctx.fillRect(-2, -19, 4, 4);
 
     ctx.restore();
   }
@@ -1761,16 +2178,17 @@ export class WorldRenderer {
     const hipShiftX = idleBlend * -1.4;
     const hipBobY = idleBlend * Math.abs(Math.sin(time * 9.5)) * 0.9;
 
-    // --- 1. Far/Left Arm (When shooting: supports the Black Glock with 2 hands! When idle: hand on waist! In air: dangles!) ---
+    // --- 1. Far/Left Arm (When shooting: supports the equipped gun with 2 hands! When idle: hand on waist! In air: dangles!) ---
     const hasGun = Boolean(player.hasBeanGun);
+    const weaponType = player.weaponType || 'glock_16mm';
     const isShooting = (player.gunShootTimer || 0) > 0 && hasGun;
 
     ctx.save();
     if (isShooting) {
-      // Two-handed tactical shooting stance: Left arm reaches forward to cup under the Glock grip!
+      // Two-handed tactical shooting stance: Left arm reaches forward to cup under the gun grip!
       const nearArmX = (1 - sideMix) * 21 + sideMix * 2;
       const nearArmY = (1 - sideMix) * 4 + sideMix * 8;
-      this.drawSupportArm(ctx, nearArmX, nearArmY, sideMix, player.gunShootTimer || 0);
+      this.drawSupportArm(ctx, nearArmX, nearArmY, sideMix, player.gunShootTimer || 0, weaponType);
     } else if (idleBlend > 0.5 && !isAction) {
       // Left arm bent akimbo with hand planted firmly on the left waist/hip of the cup!
       this.drawWaistArm(ctx, -1, tapLift, hipShiftX, hipBobY);
@@ -2237,7 +2655,8 @@ export class WorldRenderer {
         hasGun,
         isShooting,
         player.gunShootTimer || 0,
-        player.gunRecoilX || 0
+        player.gunRecoilX || 0,
+        weaponType
       );
     }
     ctx.restore();
@@ -2290,12 +2709,14 @@ export class WorldRenderer {
     ctx.restore();
   }
 
-  // Two-handed tactical shooting stance: Left/Far Arm extends across chest to support the Black Glock 16mm!
-  drawSupportArm(ctx, targetHandX, targetHandY, sideMix, gunShootTimer) {
+  // Two-handed tactical shooting stance: Left/Far Arm extends across chest to support the equipped gun!
+  drawSupportArm(ctx, targetHandX, targetHandY, sideMix, gunShootTimer, weaponType = 'glock_16mm') {
     const limbCol = '#522915';
     const outlineCol = '#3A1B0C';
-    const recoilProg = gunShootTimer / 0.22;
-    const kickX = -recoilProg * 6;
+    const isDeagle = weaponType === 'golden_deagle';
+    const duration = isDeagle ? 0.26 : 0.22;
+    const recoilProg = gunShootTimer / duration;
+    const kickX = -recoilProg * (isDeagle ? 8 : 6);
 
     ctx.save();
     ctx.lineCap = 'round';
@@ -2324,7 +2745,7 @@ export class WorldRenderer {
     ctx.quadraticCurveTo(ctrlX, ctrlY, endX, endY);
     ctx.stroke();
 
-    // Left support hand cupping firmly under the Glock grip & right hand
+    // Left support hand cupping firmly under the gun grip & right hand
     ctx.fillStyle = limbCol;
     ctx.strokeStyle = outlineCol;
     ctx.lineWidth = 1.2;
@@ -2357,7 +2778,8 @@ export class WorldRenderer {
     hasGun = false,
     isShooting = false,
     gunShootTimer = 0,
-    gunRecoilX = 0
+    gunRecoilX = 0,
+    weaponType = 'glock_16mm'
   ) {
     const limbCol = '#522915';
     const outlineCol = '#3A1B0C';
@@ -2399,11 +2821,13 @@ export class WorldRenderer {
       ctx.stroke();
     } else if (hasGun) {
       // =========================================================================
-      // EQUIPPED BLACK GLOCK 16mm (Shooting stance with recoil & awesome muzzle flash)
+      // EQUIPPED GUN (Black Glock 16mm or Golden Desert Eagle .50)
       // =========================================================================
-      const recoilProg = isShooting ? gunShootTimer / 0.22 : 0;
-      const kickX = -recoilProg * 6;
-      const kickAngle = -recoilProg * 0.22;
+      const isDeagle = weaponType === 'golden_deagle';
+      const duration = isDeagle ? 0.26 : 0.22;
+      const recoilProg = isShooting ? gunShootTimer / duration : 0;
+      const kickX = -recoilProg * (isDeagle ? 8 : 6);
+      const kickAngle = -recoilProg * (isDeagle ? 0.26 : 0.22);
       const armAngle = isShooting ? -0.12 + kickAngle : 0.22 + walkSwing * 0.3;
 
       ctx.rotate(armAngle);
@@ -2436,8 +2860,12 @@ export class WorldRenderer {
       ctx.fill();
       ctx.stroke();
 
-      // Draw the Black Glock 16mm!
-      this.drawBlackGlock16mm(ctx, handX, handY, isShooting, recoilProg);
+      // Draw the equipped weapon!
+      if (isDeagle) {
+        this.drawGoldenDesertEagle50(ctx, handX, handY, isShooting, recoilProg);
+      } else {
+        this.drawBlackGlock16mm(ctx, handX, handY, isShooting, recoilProg);
+      }
     } else if (isWaving) {
       // Raised Waving / Reaching 4-Finger Hand that dangles & trails loosely in mid-air!
       ctx.rotate(walkSwing * 0.45);
@@ -2993,10 +3421,195 @@ export class WorldRenderer {
     ctx.restore();
   }
 
+  // =========================================================================
+  // GOLDEN DESERT EAGLE .50 (Heavy polished gold hand-cannon, single slug)
+  // =========================================================================
+
+  drawGoldenDesertEagle50(ctx, x, y, isShooting, recoilProg, time = 0) {
+    ctx.save();
+    ctx.translate(x, y);
+
+    // Stance angle: level when shooting, tilted slightly up when ready
+    ctx.rotate(isShooting ? -0.05 : -0.2);
+
+    const slideKick = isShooting ? recoilProg * 7.5 : 0;
+    const outlineCol = '#451a03';
+
+    // 1. Heavy Polished Gold Lower Frame & Trigger Guard
+    const goldGrad = ctx.createLinearGradient(0, -8, 0, 14);
+    goldGrad.addColorStop(0, '#fef08a');
+    goldGrad.addColorStop(0.35, '#eab308');
+    goldGrad.addColorStop(0.7, '#ca8a04');
+    goldGrad.addColorStop(1, '#854d0e');
+
+    ctx.fillStyle = goldGrad;
+    ctx.strokeStyle = outlineCol;
+    ctx.lineWidth = 1.7;
+    ctx.lineJoin = 'round';
+
+    // Massive Magnum Frame
+    ctx.beginPath();
+    ctx.moveTo(-5, 0);
+    ctx.lineTo(5, 0);
+    ctx.lineTo(3.5, 14);
+    ctx.quadraticCurveTo(-1.5, 15.5, -7, 13.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Textured Matte Black Combat Grip Panel with Gold Emblem
+    ctx.fillStyle = '#1c1917';
+    ctx.beginPath();
+    ctx.roundRect(-4.5, 2, 6.5, 10, 2);
+    ctx.fill();
+
+    // Golden Coffee Bean Emblem embossed on grip
+    ctx.fillStyle = '#facc15';
+    ctx.beginPath();
+    ctx.ellipse(-1.2, 7, 1.8, 2.6, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Squared Heavy Desert Eagle Trigger Guard
+    ctx.strokeStyle = outlineCol;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(4, 2);
+    ctx.lineTo(9.5, 2);
+    ctx.lineTo(9.5, 9);
+    ctx.lineTo(2, 9);
+    ctx.stroke();
+
+    // Gold Skeletonized Trigger
+    ctx.strokeStyle = '#fef08a';
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(5.5, 3);
+    ctx.quadraticCurveTo(6.8, 5.5, 4.5, 7.8);
+    ctx.stroke();
+
+    // Lower Picatinny Accessory Rail
+    ctx.fillStyle = '#a16207';
+    ctx.fillRect(6, -1, 19, 3.5);
+    ctx.strokeRect(6, -1, 19, 3.5);
+
+    // 2. Heavy Titanium Gold Slide with Blowback Recoil Kick
+    ctx.save();
+    ctx.translate(-slideKick, 0);
+
+    // Massive Triangular Desert Eagle Slide
+    const slideGrad = ctx.createLinearGradient(0, -10, 0, -2);
+    slideGrad.addColorStop(0, '#fffbeb');
+    slideGrad.addColorStop(0.25, '#fde047');
+    slideGrad.addColorStop(0.65, '#eab308');
+    slideGrad.addColorStop(1, '#92400e');
+
+    ctx.fillStyle = slideGrad;
+    ctx.strokeStyle = outlineCol;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.roundRect(-5.5, -9.5, 34, 8, 1.5);
+    ctx.fill();
+    ctx.stroke();
+
+    // Top Picatinny Rail Grooves on Slide
+    ctx.strokeStyle = '#78350f';
+    ctx.lineWidth = 1.2;
+    for (let rx = 2; rx < 22; rx += 3.8) {
+      ctx.beginPath();
+      ctx.moveTo(rx, -9.5);
+      ctx.lineTo(rx, -7.5);
+      ctx.stroke();
+    }
+
+    // Rear Cocking Serrations
+    for (let sx = -3.5; sx <= 0; sx += 1.8) {
+      ctx.beginPath();
+      ctx.moveTo(sx, -7.5);
+      ctx.lineTo(sx, -2);
+      ctx.stroke();
+    }
+
+    // Dual-Port Compensator Muzzle Brake (cuts at the top of the barrel)
+    ctx.fillStyle = '#451a03';
+    ctx.fillRect(21, -9.5, 2.5, 3);
+    ctx.fillRect(25, -9.5, 2.5, 3);
+
+    // Front & Rear Combat Sights
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(-4.5, -11.5, 3, 2.2);
+    ctx.fillRect(26.5, -11.5, 2.4, 2.2);
+
+    ctx.restore(); // end slide blowback
+
+    // Ejected Massive .50 AE Brass Casing
+    if (isShooting && recoilProg > 0.08) {
+      const casingX = 14 - recoilProg * 18;
+      const casingY = -14 - recoilProg * 20;
+      ctx.save();
+      ctx.translate(casingX, casingY);
+      ctx.rotate(recoilProg * 10);
+      ctx.fillStyle = '#fde047';
+      ctx.strokeStyle = '#78350f';
+      ctx.lineWidth = 1.1;
+      ctx.fillRect(-3, -4.5, 6, 9);
+      ctx.strokeRect(-3, -4.5, 6, 9);
+      ctx.restore();
+    }
+
+    // 3. EPIC DUAL-PORT COMPENSATOR FLAME JETS + MASSIVE MUZZLE BLAST!
+    if (isShooting && recoilProg > 0.04) {
+      const flashAlpha = Math.min(1, recoilProg * 1.8);
+      const muzzleX = 32 - slideKick * 0.2;
+      const muzzleY = -5.5;
+
+      ctx.save();
+
+      // Top dual compensator gas jets erupting upwards!
+      ctx.fillStyle = `rgba(253, 224, 71, ${flashAlpha * 0.9})`;
+      ctx.beginPath();
+      ctx.moveTo(21, -9.5);
+      ctx.lineTo(22, -22);
+      ctx.lineTo(24, -9.5);
+      ctx.moveTo(25, -9.5);
+      ctx.lineTo(26, -24);
+      ctx.lineTo(28, -9.5);
+      ctx.fill();
+
+      // Massive Blinding Forward Fireball & 8-Point Starburst
+      ctx.translate(muzzleX, muzzleY);
+      const flashScale = 1.25 + recoilProg * 1.35;
+      ctx.scale(flashScale, flashScale);
+
+      // Outer golden flame shockwave
+      ctx.strokeStyle = `rgba(245, 158, 11, ${flashAlpha * 0.8})`;
+      ctx.lineWidth = 3.2;
+      ctx.beginPath();
+      ctx.arc(4, 0, 16 + (1 - recoilProg) * 10, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Incandescent gold/white multi-point starburst
+      this.drawFourPointSparkle(10, 0, 34, `rgba(254, 240, 138, ${flashAlpha})`);
+      ctx.save();
+      ctx.rotate(Math.PI / 4);
+      this.drawFourPointSparkle(8, 0, 26, `rgba(245, 158, 11, ${flashAlpha * 0.9})`);
+      ctx.restore();
+
+      // Blazing white-hot plasma core
+      ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
+      ctx.beginPath();
+      ctx.ellipse(6, 0, 9, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
   drawWeaponPickup(pickup, cameraX, time) {
     if (pickup.collected) return;
     const sx = pickup.x - cameraX;
-    if (sx < -80 || sx > this.width + 80) return;
+    if (sx < -90 || sx > this.width + 90) return;
 
     const ctx = this.ctx;
     const bob = Math.sin(time * 3.8 + pickup.x * 0.01) * 6;
@@ -3005,14 +3618,22 @@ export class WorldRenderer {
     ctx.save();
     ctx.translate(sx, pickup.y + bob);
 
-    // Radiant pink-and-golden collectible aura
-    const aura = ctx.createRadialGradient(0, 0, 4, 0, 0, 32);
-    aura.addColorStop(0, 'rgba(244, 114, 182, 0.75)');
-    aura.addColorStop(0.55, 'rgba(251, 191, 36, 0.35)');
-    aura.addColorStop(1, 'rgba(244, 114, 182, 0)');
+    const isDeagle = pickup.type === 'golden_deagle';
+
+    // Radiant collectible aura
+    const aura = ctx.createRadialGradient(0, 0, 4, 0, 0, 36);
+    if (isDeagle) {
+      aura.addColorStop(0, 'rgba(250, 204, 21, 0.85)');
+      aura.addColorStop(0.55, 'rgba(245, 158, 11, 0.45)');
+      aura.addColorStop(1, 'rgba(250, 204, 21, 0)');
+    } else {
+      aura.addColorStop(0, 'rgba(244, 114, 182, 0.75)');
+      aura.addColorStop(0.55, 'rgba(251, 191, 36, 0.35)');
+      aura.addColorStop(1, 'rgba(244, 114, 182, 0)');
+    }
     ctx.fillStyle = aura;
     ctx.beginPath();
-    ctx.arc(0, 0, 32, 0, Math.PI * 2);
+    ctx.arc(0, 0, 36, 0, Math.PI * 2);
     ctx.fill();
 
     // Rotating 4-point golden sparkles
@@ -3020,86 +3641,148 @@ export class WorldRenderer {
     ctx.rotate(time * 1.4);
     for (let i = 0; i < 4; i++) {
       ctx.rotate(Math.PI / 2);
-      this.drawFourPointSparkle(0, -22, 6, '#fde047');
+      this.drawFourPointSparkle(0, -24, 6, isDeagle ? '#fef08a' : '#fde047');
     }
     ctx.restore();
 
-    // Floating 3D Black Glock 16mm Display
+    // Floating 3D Gun Display
     ctx.save();
     ctx.rotate(tilt);
     ctx.scale(1.4, 1.4);
-    this.drawBlackGlock16mm(ctx, -10, 0, false, 0);
+    if (isDeagle) {
+      this.drawGoldenDesertEagle50(ctx, -10, 0, false, 0, time);
+    } else {
+      this.drawBlackGlock16mm(ctx, -10, 0, false, 0);
+    }
     ctx.restore();
 
-    // Floating Label Pill: "★ BLACK GLOCK 16mm ★"
-    ctx.fillStyle = 'rgba(17, 18, 22, 0.92)';
-    ctx.strokeStyle = '#f472b6';
+    // Floating Label Pill
+    ctx.fillStyle = 'rgba(17, 18, 22, 0.94)';
+    ctx.strokeStyle = isDeagle ? '#facc15' : '#f472b6';
     ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.roundRect(-66, -38, 132, 20, 9);
+    const labelText = isDeagle ? '★ GOLDEN DESERT EAGLE .50 ★' : '★ BLACK GLOCK 16mm ★';
+    const pillW = isDeagle ? 176 : 132;
+    ctx.roundRect(-pillW / 2, -38, pillW, 20, 9);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = '#fde047';
+    ctx.fillStyle = isDeagle ? '#fef08a' : '#fde047';
     ctx.font = 'bold 10px system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('★ BLACK GLOCK 16mm ★', 0, -24);
+    ctx.fillText(labelText, 0, -24);
 
     ctx.restore();
   }
 
   drawBeanProjectile(proj, cameraX, time) {
     const sx = proj.x - cameraX;
-    if (sx < -30 || sx > this.width + 30) return;
+    if (sx < -35 || sx > this.width + 35) return;
 
     const ctx = this.ctx;
     ctx.save();
     ctx.translate(sx, proj.y);
 
-    // Golden & pink energy comet streak behind the flying bean
     const dir = Math.sign(proj.vx) || 1;
-    const streakGrad = ctx.createLinearGradient(0, 0, -dir * 32, 0);
-    streakGrad.addColorStop(0, 'rgba(244, 114, 182, 0.85)');
-    streakGrad.addColorStop(0.5, 'rgba(253, 224, 71, 0.65)');
-    streakGrad.addColorStop(1, 'rgba(244, 114, 182, 0)');
-    ctx.fillStyle = streakGrad;
-    ctx.beginPath();
-    ctx.moveTo(0, -6);
-    ctx.lineTo(0, 6);
-    ctx.lineTo(-dir * 32, 0);
-    ctx.closePath();
-    ctx.fill();
+    const isDeagle = Boolean(proj.isDeagleSlug);
 
-    // Rotate the 3D roasted coffee bean
-    ctx.rotate(proj.rot || 0);
+    if (isDeagle) {
+      // Supercharged Golden Magnum Energy Streak & Shockwave Ring
+      const streakGrad = ctx.createLinearGradient(0, 0, -dir * 46, 0);
+      streakGrad.addColorStop(0, 'rgba(254, 240, 138, 0.95)');
+      streakGrad.addColorStop(0.4, 'rgba(245, 158, 11, 0.7)');
+      streakGrad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+      ctx.fillStyle = streakGrad;
+      ctx.beginPath();
+      ctx.moveTo(0, -9);
+      ctx.lineTo(0, 9);
+      ctx.lineTo(-dir * 46, 0);
+      ctx.closePath();
+      ctx.fill();
 
-    // Roasted Coffee Bean Body
-    const beanGrad = ctx.createLinearGradient(-7, -8, 7, 8);
-    beanGrad.addColorStop(0, '#9A4824');
-    beanGrad.addColorStop(0.5, '#683018');
-    beanGrad.addColorStop(1, '#3B170B');
+      // Outer golden supersonic shockwave halo
+      ctx.strokeStyle = 'rgba(253, 224, 71, 0.75)';
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.ellipse(-dir * 8, 0, 8, 14, 0, 0, Math.PI * 2);
+      ctx.stroke();
 
-    ctx.fillStyle = beanGrad;
-    ctx.strokeStyle = '#240C04';
-    ctx.lineWidth = 2.0;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 7.8, 10.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+      // Rotate heavy gilded slug
+      ctx.rotate(proj.rot || 0);
 
-    // S-curve center crease
-    ctx.strokeStyle = '#1D0A03';
-    ctx.lineWidth = 1.8;
-    ctx.beginPath();
-    ctx.moveTo(-1, -7.5);
-    ctx.bezierCurveTo(-3.5, -2, 3.5, 2, 1, 7.5);
-    ctx.stroke();
+      // Heavy Gilded Golden Coffee Bean Slug
+      const slugGrad = ctx.createLinearGradient(-9, -11, 9, 11);
+      slugGrad.addColorStop(0, '#fffbeb');
+      slugGrad.addColorStop(0.35, '#fde047');
+      slugGrad.addColorStop(0.7, '#ca8a04');
+      slugGrad.addColorStop(1, '#78350f');
 
-    // Glossy catchlight shine
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
-    ctx.beginPath();
-    ctx.ellipse(-2.8, -3.2, 1.8, 3.5, -0.2, 0, Math.PI * 2);
-    ctx.fill();
+      ctx.fillStyle = slugGrad;
+      ctx.strokeStyle = '#451a03';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 10, 13, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Center gold crease
+      ctx.strokeStyle = '#78350f';
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.moveTo(-1, -9.5);
+      ctx.bezierCurveTo(-4, -2.5, 4, 2.5, 1, 9.5);
+      ctx.stroke();
+
+      // Specular shine
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.ellipse(-3.5, -4, 2.5, 4.5, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // Golden & pink energy comet streak behind the flying bean
+      const streakGrad = ctx.createLinearGradient(0, 0, -dir * 32, 0);
+      streakGrad.addColorStop(0, 'rgba(244, 114, 182, 0.85)');
+      streakGrad.addColorStop(0.5, 'rgba(253, 224, 71, 0.65)');
+      streakGrad.addColorStop(1, 'rgba(244, 114, 182, 0)');
+      ctx.fillStyle = streakGrad;
+      ctx.beginPath();
+      ctx.moveTo(0, -6);
+      ctx.lineTo(0, 6);
+      ctx.lineTo(-dir * 32, 0);
+      ctx.closePath();
+      ctx.fill();
+
+      // Rotate the 3D roasted coffee bean
+      ctx.rotate(proj.rot || 0);
+
+      // Roasted Coffee Bean Body
+      const beanGrad = ctx.createLinearGradient(-7, -8, 7, 8);
+      beanGrad.addColorStop(0, '#9A4824');
+      beanGrad.addColorStop(0.5, '#683018');
+      beanGrad.addColorStop(1, '#3B170B');
+
+      ctx.fillStyle = beanGrad;
+      ctx.strokeStyle = '#240C04';
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 7.8, 10.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // S-curve center crease
+      ctx.strokeStyle = '#1D0A03';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(-1, -7.5);
+      ctx.bezierCurveTo(-3.5, -2, 3.5, 2, 1, 7.5);
+      ctx.stroke();
+
+      // Glossy catchlight shine
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+      ctx.beginPath();
+      ctx.ellipse(-2.8, -3.2, 1.8, 3.5, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     ctx.restore();
   }

@@ -358,6 +358,33 @@ body {
   background: #451a03;
 }
 
+.level-select-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(180deg, #ec4899 0%, #be185d 100%);
+  color: #ffffff;
+  border: 3px solid #500724;
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.4);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.level-select-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.12);
+}
+
+.level-select-btn.lvl2 {
+  background: linear-gradient(180deg, #a855f7 0%, #7e22ce 100%);
+  border-color: #3b0764;
+}
+
 /* Top-Right Score, Beans & Timer (Matches Image 1 Top-Right!) */
 .hud-right {
   display: flex;

@@ -57,8 +57,19 @@ export class CoffeePlatformerEngine {
     this.renderer.resize(this.width, this.height, scaleFactor);
   }
 
-  resetLevel() {
-    this.level = createLevelData();
+  loadLevel(levelIndex) {
+    this.currentLevel = levelIndex;
+    this.victoryTriggered = false;
+    this.resetLevel(levelIndex);
+    this.paused = false;
+  }
+
+  resetLevel(levelIndex = this.currentLevel || 1) {
+    this.currentLevel = levelIndex;
+    this.level = createLevelData(this.currentLevel);
+    if (this.renderer && this.renderer.setLevel) {
+      this.renderer.setLevel(this.currentLevel);
+    }
 
     // Preserve already discovered products across runs if desired, or let nodes show uncollected
     this.level.productNodes.forEach((node) => {
@@ -108,6 +119,7 @@ export class CoffeePlatformerEngine {
       meleeCooldown: 0,
       shotCooldown: 0,
       hasBeanGun: false, // Picked up Bean Blaster Gun
+      weaponType: null, // 'glock_16mm' or 'golden_deagle'
       gunShootTimer: 0, // Recoil & shooting pose timer
       gunRecoilX: 0,
       dashTimer: 0,
@@ -142,10 +154,12 @@ export class CoffeePlatformerEngine {
     this.shakeIntensity = 0;
 
     this.beanCount = 0;
+    this.gemCount = 0;
+    this.podCount = 0;
     this.score = 0;
     this.combo = 0;
     this.comboTimer = 0;
-    this.currentBiome = 'Starry Espresso Hills';
+    this.currentBiome = this.level.zone1Name || 'Starry Espresso Hills';
 
     this.projectiles = [];
     this.dyingEnemies = [];
@@ -267,7 +281,37 @@ export class CoffeePlatformerEngine {
       return plat.y + bob + tiltOffset + edgeDrop;
     }
 
-    // Biscuit, Chocolate Cookie, and Gingerbread platforms: flat top with smooth rounded corners at edges
+    if (plat.type === 'marshmallow_pad') {
+      // Soft pillowy marshmallow trampoline with subtle breathing bob and pillowy crowned surface
+      const bob = Math.sin(time * 3.2 + plat.x * 0.025) * 2.5;
+      const archDrop = (u * u) * 4.5;
+      return plat.y + bob + archDrop;
+    }
+
+    if (plat.type === 'obsidian_rock') {
+      // Rugged volcanic obsidian boulder
+      const clampedU = Math.max(-0.96, Math.min(0.96, u));
+      const domeDrop = (1 - Math.sqrt(1 - clampedU * clampedU)) * (plat.h * 0.26);
+      return plat.y - 1 + domeDrop;
+    }
+
+    if (plat.type === 'amethyst_crystal') {
+      // Crystalline faceted amethyst platform with beveled crystalline edges
+      const edgeRadius = 14;
+      let edgeDrop = 0;
+      if (localX < edgeRadius) {
+        edgeDrop = ((edgeRadius - localX) / edgeRadius) * 6.5;
+      } else if (localX > plat.w - edgeRadius) {
+        edgeDrop = ((localX - (plat.w - edgeRadius)) / edgeRadius) * 6.5;
+      }
+      return plat.y + edgeDrop;
+    }
+
+    if (plat.type === 'steam_vent') {
+      return plat.y;
+    }
+
+    // Biscuit, Wafer, Chocolate Cookie, and Gingerbread platforms: flat top with smooth rounded corners at edges
     const edgeRadius = Math.min(28, plat.w * 0.25);
     let edgeDrop = 0;
     if (localX < edgeRadius) {
@@ -347,9 +391,59 @@ export class CoffeePlatformerEngine {
   triggerEspressoShot() {
     const p = this.player;
 
-    // When Bean Blaster Gun is equipped, fire rapid-action roasted coffee beans!
+    // When a gun is equipped (Black Glock 16mm or Golden Desert Eagle .50)
     if (p.hasBeanGun) {
       if (p.shotCooldown > 0) return;
+
+      const isDeagle = p.weaponType === 'golden_deagle';
+
+      if (isDeagle) {
+        // GOLDEN DESERT EAGLE .50: Heavy thunderous single-bullet slug shot!
+        p.shotCooldown = 0.22;
+        p.gunShootTimer = 0.26;
+        p.gunRecoilX = -p.facing * 11;
+        p.vx -= p.facing * 120; // Massive magnum kickback
+        this.shakeTimer = 0.16;
+        this.shakeIntensity = 5.5;
+        sound.playDeagleShot();
+
+        // Exactly one high-velocity armor-piercing roasted slug!
+        this.projectiles.push({
+          x: p.x + p.facing * 46,
+          y: p.y - 3,
+          vx: p.facing * 990,
+          vy: 0,
+          r: 12,
+          life: 1.6,
+          isBeanProjectile: true,
+          isDeagleSlug: true,
+          rot: 0,
+          rotSpeed: 0,
+          pierce: 2
+        });
+
+        // Dual compensator jets & blazing golden flame embers
+        for (let s = 0; s < 8; s++) {
+          this.particles.push({
+            x: p.x + p.facing * 48,
+            y: p.y - 3 + (Math.random() - 0.5) * 10,
+            vx: p.facing * (130 + Math.random() * 200),
+            vy: (Math.random() - 0.5) * 80,
+            r: 2.8 + Math.random() * 4.2,
+            color: Math.random() < 0.6 ? '#fde047' : '#f59e0b',
+            life: 0.24,
+            maxLife: 0.24,
+            gravity: 40
+          });
+        }
+
+        // Heavy cannon firing squash
+        this.impulseScale(1.36, 0.74, -2.6);
+        this.syncHud();
+        return;
+      }
+
+      // BLACK GLOCK 16mm: Snappy tactical single-bullet shot
       p.shotCooldown = 0.16;
       p.gunShootTimer = 0.22;
       p.gunRecoilX = -p.facing * 7;
@@ -731,6 +825,21 @@ export class CoffeePlatformerEngine {
       const crossedTop = prevY + p.r <= prevSurfY + 18 && p.y + p.r >= surfY - 2;
 
       if (isStickyGround || crossedTop) {
+        // NEW ELEMENT: Marshmallow Trampoline Pad - Launches player sky-high!
+        if (plat.type === 'marshmallow_pad') {
+          plat.squashTimer = 0.35;
+          sound.playMarshmallowBounce();
+          p.vy = -(plat.bouncePower || 880);
+          p.onGround = false;
+          p.groundPlat = null;
+          p.coyoteTimer = 0;
+          p.jumpsRemaining = 2; // Refill mid-air double jump!
+          this.impulseScale(0.55, 1.55, 6.0);
+          this.spawnCoffeeSplash(p.x, surfY, 14, '#fbcfe8');
+          this.addFloatingText(p.x, p.y - 30, 'BOING! ★ SUPER BOUNCE', '#f472b6');
+          break;
+        }
+
         p.y = surfY - p.r;
         p.vy = 0;
         p.onGround = true;
@@ -768,14 +877,19 @@ export class CoffeePlatformerEngine {
           sound.playProductUnlock();
         }
 
-        // Grand Roastery Finish
+        // Grand Finish (Level 1 Roastery or Level 2 Celestial Observatory)
         if (plat.isFinish && !this.victoryTriggered) {
           this.victoryTriggered = true;
           sound.playProductUnlock();
           if (this.callbacks.onVictory) {
             this.callbacks.onVictory({
+              level: this.currentLevel,
+              nextLevel: this.currentLevel === 1 ? 2 : null,
+              levelTitle: this.level.title,
               score: this.score,
               beans: this.beanCount,
+              gems: this.gemCount || 0,
+              pods: this.podCount || 0,
               discoveredCount: this.discoveredProducts.size,
               time: Math.floor(this.elapsedSeconds)
             });
@@ -799,6 +913,32 @@ export class CoffeePlatformerEngine {
       p.x = p.checkpointX;
       p.vx = 0;
       p.vy = 0;
+    }
+
+    // Platform updates & Steam Vent updraft
+    for (const plat of this.level.platforms) {
+      if (plat.squashTimer > 0) plat.squashTimer -= dt;
+      if (plat.type === 'steam_vent') {
+        const inVentX = p.x >= plat.x - 8 && p.x <= plat.x + plat.w + 8;
+        const inVentY = p.y >= plat.y - 190 && p.y <= plat.y + 12;
+        if (inVentX && inVentY) {
+          p.vy = Math.min(p.vy, -290);
+          p.onGround = false;
+          if (Math.random() < 0.35) {
+            this.particles.push({
+              x: p.x + (Math.random() - 0.5) * 16,
+              y: p.y + 16,
+              vx: (Math.random() - 0.5) * 20,
+              vy: -110 - Math.random() * 80,
+              r: 3 + Math.random() * 4,
+              color: 'rgba(255, 255, 255, 0.45)',
+              life: 0.28,
+              maxLife: 0.28,
+              gravity: -25
+            });
+          }
+        }
+      }
     }
 
     // --- Idle Foot-Tap & Hands-on-Waist State + Facial Blinking & Eye Gaze Tracking ---
@@ -928,19 +1068,63 @@ export class CoffeePlatformerEngine {
       }
     }
 
-    // Collect Weapon Pickups (Bean Blaster Gun)
+    // Collect Crystalline Sugar Gems (+250 points, restores caffeine, sparkling aura)
+    if (this.level.sugarGems) {
+      for (const gem of this.level.sugarGems) {
+        if (gem.collected) continue;
+        const dist = Math.hypot(p.x - gem.x, p.y - gem.y);
+        if (dist < p.r + 20) {
+          gem.collected = true;
+          this.gemCount = (this.gemCount || 0) + 1;
+          this.score += 250;
+          p.caffeine = Math.min(100, p.caffeine + 15);
+          sound.playGemCollect();
+          this.spawnCoffeeSplash(gem.x, gem.y, 10, '#c084fc');
+          this.addFloatingText(gem.x, gem.y - 18, '+250 SUGAR GEM!', '#e879f9');
+          this.syncHud();
+        }
+      }
+    }
+
+    // Collect Roasted Cacao Pods (+500 points, rich chocolate energy)
+    if (this.level.cacaoPods) {
+      for (const pod of this.level.cacaoPods) {
+        if (pod.collected) continue;
+        const dist = Math.hypot(p.x - pod.x, p.y - pod.y);
+        if (dist < p.r + 22) {
+          pod.collected = true;
+          this.podCount = (this.podCount || 0) + 1;
+          this.score += 500;
+          p.caffeine = 100;
+          sound.playProductUnlock();
+          this.spawnCoffeeSplash(pod.x, pod.y, 14, '#fbbf24');
+          this.addFloatingText(pod.x, pod.y - 24, '+500 CACAO POD!', '#f59e0b');
+          this.syncHud();
+        }
+      }
+    }
+
+    // Collect Weapon Pickups (Black Glock 16mm or Golden Desert Eagle .50)
     if (this.level.weaponPickups) {
       for (const pickup of this.level.weaponPickups) {
         if (pickup.collected) continue;
         const dist = Math.hypot(p.x - pickup.x, p.y - pickup.y);
-        if (dist < p.r + 32) {
+        if (dist < p.r + 34) {
           pickup.collected = true;
           p.hasBeanGun = true;
+          p.weaponType = pickup.type || 'glock_16mm';
           sound.playProductUnlock();
-          this.impulseScale(1.34, 0.76, 3.5);
-          this.addFloatingText(pickup.x, pickup.y - 36, '★ BLACK GLOCK 16mm EQUIPPED! ★', '#f472b6');
-          this.addFloatingText(pickup.x, pickup.y - 14, '[X] / [CLICK] TO SHOOT BEANS!', '#fde047');
-          this.spawnPinkGooExplosion(pickup.x, pickup.y, 14, 160);
+          this.impulseScale(1.36, 0.74, 3.8);
+
+          if (p.weaponType === 'golden_deagle') {
+            this.addFloatingText(pickup.x, pickup.y - 38, '★ GOLDEN DESERT EAGLE .50! ★', '#facc15');
+            this.addFloatingText(pickup.x, pickup.y - 14, '[X] / [CLICK] TO FIRE HEAVY SLUG!', '#fef08a');
+            this.spawnPinkGooExplosion(pickup.x, pickup.y, 16, 200);
+          } else {
+            this.addFloatingText(pickup.x, pickup.y - 36, '★ BLACK GLOCK 16mm EQUIPPED! ★', '#f472b6');
+            this.addFloatingText(pickup.x, pickup.y - 14, '[X] / [CLICK] TO SHOOT BEANS!', '#fde047');
+            this.spawnPinkGooExplosion(pickup.x, pickup.y, 14, 160);
+          }
           this.syncHud();
         }
       }
@@ -1289,7 +1473,11 @@ export class CoffeePlatformerEngine {
     this.cameraX += (targetCamX - this.cameraX) * 6.5 * dt;
 
     // Biome name update
-    const newBiome = p.x < 3250 ? 'Starry Espresso Hills' : 'Sunset Biscotti Grove';
+    const isLevel2 = this.currentLevel === 2;
+    const splitX = isLevel2 ? 3350 : 3250;
+    const zone1 = isLevel2 ? 'Neon Mocha Grotto' : 'Starry Espresso Hills';
+    const zone2 = isLevel2 ? 'Frothy Caramel Caldera' : 'Sunset Biscotti Grove';
+    const newBiome = p.x < splitX ? zone1 : zone2;
     if (newBiome !== this.currentBiome) {
       this.currentBiome = newBiome;
       this.syncHud();
@@ -1299,16 +1487,21 @@ export class CoffeePlatformerEngine {
   syncHud() {
     if (!this.callbacks.onHudUpdate) return;
     this.callbacks.onHudUpdate({
+      level: this.currentLevel || 1,
+      levelTitle: this.level ? this.level.title : 'Level 1: Starry Espresso Hills',
       hp: this.player.hp,
       maxHp: this.player.maxHp,
       caffeine: Math.round(this.player.caffeine),
       beans: this.beanCount,
+      gems: this.gemCount || 0,
+      pods: this.podCount || 0,
       score: this.score,
       biome: this.currentBiome,
       discoveredCount: this.discoveredProducts.size,
       totalProducts: PRODUCTS.length,
       shieldActive: this.player.shieldActive,
-      hasBeanGun: this.player.hasBeanGun
+      hasBeanGun: this.player.hasBeanGun,
+      weaponType: this.player.weaponType
     });
   }
 
@@ -1330,7 +1523,7 @@ export class CoffeePlatformerEngine {
     // 2. Parallax Espresso Machines, Grinders, Rolling Hills, and Coffee Flora
     this.renderer.drawParallaxBackground(camX, this.time);
 
-    // 3. Platforms (Biscuits, Mossy Giant Beans, Sugar Cubes, Biscotti, Chocolate Cookies, Gingerbread)
+    // 3. Platforms (Biscuits, Mossy Giant Beans, Sugar Cubes, Biscotti, Chocolate Cookies, Gingerbread, Obsidian, Amethyst, Wafers, Marshmallow Trampolines)
     for (const plat of this.level.platforms) {
       this.renderer.drawPlatform(plat, camX, this.time);
     }
@@ -1338,16 +1531,30 @@ export class CoffeePlatformerEngine {
     // 4. Persistent Pink Goo Splats on Platforms
     this.renderer.drawPinkGooSplats(this.pinkGooSplats, camX);
 
-    // 5. Weapon Pickups (Bean Blaster Gun)
+    // 5. Weapon Pickups (Black Glock 16mm or Golden Desert Eagle .50)
     if (this.level.weaponPickups) {
       for (const pickup of this.level.weaponPickups) {
         this.renderer.drawWeaponPickup(pickup, camX, this.time);
       }
     }
 
-    // 6. Collectible Golden Coffee Beans
+    // 6a. Collectible Golden Coffee Beans
     for (const bean of this.level.beans) {
       this.renderer.drawBean(bean, camX, this.time);
+    }
+
+    // 6b. Collectible Crystalline Sugar Gems (Level 2)
+    if (this.level.sugarGems) {
+      for (const gem of this.level.sugarGems) {
+        this.renderer.drawSugarGem(gem, camX, this.time);
+      }
+    }
+
+    // 6c. Collectible Roasted Cacao Pods (Level 2)
+    if (this.level.cacaoPods) {
+      for (const pod of this.level.cacaoPods) {
+        this.renderer.drawCacaoPod(pod, camX, this.time);
+      }
     }
 
     // 7. Mystery Product Pedestals

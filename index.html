@@ -50,6 +50,9 @@
 
             <!-- Top-Center: Quick Action Bar -->
             <div class="hud-center">
+              <button class="level-select-btn" id="level-select-btn" title="Switch Level (Level 1 / Level 2)">
+                <span id="hud-level-badge">LVL 1</span>
+              </button>
               <button class="vault-trigger-btn" id="open-vault-btn">
                 <span class="vault-badge-icon">☕</span>
                 <span>Product Vault</span>
@@ -66,6 +69,11 @@
                 <span class="golden-bean-icon"></span>
                 <span class="bean-multiplier">×</span>
                 <span class="bean-value" id="hud-beans">0</span>
+              </div>
+              <div class="gem-counter-row" id="hud-gems-row" style="display:none; align-items:center; gap:6px; font-size:18px; font-weight:700; color:#f5d0fe; text-shadow: 0 2px 0 #581c87;">
+                <span>💎</span>
+                <span class="bean-multiplier">×</span>
+                <span id="hud-gems">0</span>
               </div>
               <div class="score-row">
                 <span class="score-label">SCORE:</span>
@@ -164,13 +172,14 @@
           <!-- VICTORY ROASTERY MODAL -->
           <div class="modal-backdrop hidden" id="victory-modal">
             <div class="victory-dialog">
-              <div class="victory-badge">🏆 GRAND BARISTA CHAMPION 🏆</div>
-              <h2>You Reached the Golden Roastery Sanctuary!</h2>
-              <p>Your cup brims with legendary crema across the Starry Espresso Hills and Sunset Biscotti Grove.</p>
+              <div class="victory-badge" id="victory-badge">🏆 LEVEL COMPLETED! 🏆</div>
+              <h2 id="victory-title">You Reached the Golden Roastery Sanctuary!</h2>
+              <p id="victory-desc">Your cup brims with legendary crema across the coffee realms.</p>
               <div class="victory-stats" id="victory-stats"></div>
               <div class="victory-actions">
                 <button class="btn-secondary" id="victory-vault-btn">Inspect Product Vault</button>
-                <button class="btn-primary" id="victory-replay-btn">Play Again ↺</button>
+                <button class="btn-primary" id="victory-next-btn">Next Level ➔</button>
+                <button class="btn-secondary" id="victory-replay-btn">Replay ↺</button>
               </div>
             </div>
           </div>

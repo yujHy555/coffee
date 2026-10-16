@@ -214,6 +214,84 @@ class SoundManager {
       osc.stop(now + 0.46);
     });
   }
+
+  playDeagleShot() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+
+    // 1. Heavy magnum sub-bass cannon thud!
+    const bassOsc = this.ctx.createOscillator();
+    const bassGain = this.ctx.createGain();
+    bassOsc.type = 'triangle';
+    bassOsc.frequency.setValueAtTime(260, now);
+    bassOsc.frequency.exponentialRampToValueAtTime(45, now + 0.22);
+    bassGain.gain.setValueAtTime(0.38, now);
+    bassGain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+    bassOsc.connect(bassGain);
+    bassGain.connect(this.ctx.destination);
+    bassOsc.start(now);
+    bassOsc.stop(now + 0.25);
+
+    // 2. High-caliber supersonic crack!
+    const crackOsc = this.ctx.createOscillator();
+    const crackGain = this.ctx.createGain();
+    crackOsc.type = 'sawtooth';
+    crackOsc.frequency.setValueAtTime(920, now);
+    crackOsc.frequency.exponentialRampToValueAtTime(140, now + 0.08);
+    crackGain.gain.setValueAtTime(0.24, now);
+    crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+    crackOsc.connect(crackGain);
+    crackGain.connect(this.ctx.destination);
+    crackOsc.start(now);
+    crackOsc.stop(now + 0.1);
+  }
+
+  playMarshmallowBounce() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(220, now);
+    osc.frequency.exponentialRampToValueAtTime(620, now + 0.18);
+
+    gain.gain.setValueAtTime(0.26, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.25);
+  }
+
+  playGemCollect() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const notes = [1046.5, 1318.5, 1568.0, 2093.0];
+    notes.forEach((freq, idx) => {
+      const t = this.ctx.currentTime + idx * 0.035;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t);
+
+      gain.gain.setValueAtTime(0.14, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.19);
+    });
+  }
 }
 
 export const sound = new SoundManager();
