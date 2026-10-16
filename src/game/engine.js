@@ -70,11 +70,12 @@ export class CoffeePlatformerEngine {
       y: 420,
       vx: 0,
       vy: 0,
-      r: 22,
+      r: 25, // Slightly larger protagonist presence
       facing: 1,
       onGround: false,
       jumpsRemaining: 2,
       coyoteTimer: 0,
+      jumpBufferTimer: 0,
       hp: 3,
       maxHp: 3,
       caffeine: 65, // 0 to 100 bar under hearts
@@ -86,6 +87,11 @@ export class CoffeePlatformerEngine {
       dashCooldown: 0,
       scaleX: 1,
       scaleY: 1,
+      scaleVx: 0, // Harmonic spring velocity X
+      scaleVy: 0, // Harmonic spring velocity Y
+      tiltAngle: 0,
+      sloshAngle: 0,
+      sloshVel: 0,
       animTime: 0,
       shieldActive: this.unlockedPowerups.has('nitro_shield'),
       checkpointX: 130,
@@ -124,7 +130,15 @@ export class CoffeePlatformerEngine {
     });
 
     window.addEventListener('keyup', (e) => {
-      this.keys.delete(e.code);
+      const code = e.code;
+      this.keys.delete(code);
+
+      // Variable jump height: releasing jump key early while ascending cuts upward velocity smoothly
+      if (code === 'Space' || code === 'KeyW' || code === 'ArrowUp') {
+        if (this.player && this.player.vy < -220) {
+          this.player.vy *= 0.56;
+        }
+      }
     });
   }
 
@@ -134,6 +148,7 @@ export class CoffeePlatformerEngine {
 
     // Jump: Space / W / ArrowUp
     if (code === 'Space' || code === 'KeyW' || code === 'ArrowUp') {
+      this.player.jumpBufferTimer = 0.14;
       this.triggerJump();
     }
     // Spoon Melee: KeyZ / KeyJ
@@ -150,26 +165,38 @@ export class CoffeePlatformerEngine {
     }
   }
 
+  impulseScale(targetScaleX, targetScaleY, impulseVy = 0) {
+    const p = this.player;
+    p.scaleX = targetScaleX;
+    p.scaleY = targetScaleY;
+    p.scaleVx = (1 - targetScaleX) * 4.5;
+    p.scaleVy = (1 - targetScaleY) * 4.5 + impulseVy;
+    p.sloshVel += (targetScaleY - targetScaleX) * 14 * p.facing;
+  }
+
   triggerJump() {
     const p = this.player;
     const maxJumps = this.unlockedPowerups.has('golden_boost') ? 3 : 2;
 
     if (p.onGround || p.coyoteTimer > 0) {
-      p.vy = -560;
+      p.vy = -595;
       p.onGround = false;
       p.coyoteTimer = 0;
+      p.jumpBufferTimer = 0;
       p.jumpsRemaining = maxJumps - 1;
-      p.scaleX = 0.78;
-      p.scaleY = 1.28;
+      // Snappy vertical stretch on takeoff!
+      this.impulseScale(0.68, 1.38, 3.2);
       sound.playJump(false);
-      this.spawnCoffeeSplash(p.x, p.y - 16, 8, '#78350f');
+      this.spawnCoffeeSplash(p.x, p.y - 18, 9, '#78350f');
+      this.spawnCoffeeSplash(p.x, p.y + 22, 6, '#fde68a');
     } else if (p.jumpsRemaining > 0) {
-      p.vy = -510;
+      p.vy = -535;
       p.jumpsRemaining--;
-      p.scaleX = 0.82;
-      p.scaleY = 1.22;
+      p.jumpBufferTimer = 0;
+      // Double-jump mid-air pop & stretch!
+      this.impulseScale(0.72, 1.34, 3.6);
       sound.playJump(true);
-      this.spawnCoffeeSplash(p.x, p.y + 14, 12, '#fef08a');
+      this.spawnCoffeeSplash(p.x, p.y + 16, 14, '#fef08a');
     }
   }
 
@@ -179,11 +206,14 @@ export class CoffeePlatformerEngine {
 
     const upgraded = this.unlockedPowerups.has('silver_spoon');
     p.meleeTimer = 0.24;
-    p.meleeCooldown = 0.34;
+    p.meleeCooldown = 0.32;
+    // Dynamic forward lunge & horizontal stretch on melee swing!
+    p.vx += p.facing * 135;
+    this.impulseScale(1.28, 0.8, -1.8);
     sound.playSpoonSwing(upgraded);
 
     // Check melee hitbox in front of player
-    const reach = upgraded ? 78 : 54;
+    const reach = upgraded ? 84 : 60;
     const hitX = p.x + p.facing * (reach * 0.6);
     const hitY = p.y;
 
@@ -191,7 +221,7 @@ export class CoffeePlatformerEngine {
       if (enemy.dead) return;
       const dist = Math.hypot(enemy.x - hitX, enemy.y - hitY);
       if (dist <= reach) {
-        this.damageEnemy(enemy, upgraded ? 2 : 1, p.facing * 220);
+        this.damageEnemy(enemy, upgraded ? 2 : 1, p.facing * 240);
       }
     });
   }
@@ -201,7 +231,7 @@ export class CoffeePlatformerEngine {
     if (p.shotCooldown > 0 || p.caffeine < 8) return;
 
     p.caffeine = Math.max(0, p.caffeine - 8);
-    p.shotCooldown = 0.26;
+    p.shotCooldown = 0.24;
     sound.playEspressoShot();
 
     const isTriple = this.unlockedPowerups.has('triple_shot');
@@ -209,9 +239,9 @@ export class CoffeePlatformerEngine {
 
     spreads.forEach((vySpread) => {
       this.projectiles.push({
-        x: p.x + p.facing * 26,
+        x: p.x + p.facing * 28,
         y: p.y - 4,
-        vx: p.facing * 640,
+        vx: p.facing * 660,
         vy: vySpread,
         r: isTriple ? 9 : 7,
         pierce: isTriple ? 2 : 1,
@@ -219,8 +249,8 @@ export class CoffeePlatformerEngine {
       });
     });
 
-    p.scaleX = 1.18;
-    p.scaleY = 0.86;
+    // Satisfying recoil squash on firing!
+    this.impulseScale(1.26, 0.81, -1.5);
     this.syncHud();
   }
 
@@ -229,12 +259,14 @@ export class CoffeePlatformerEngine {
     if (p.dashCooldown > 0 || p.caffeine < 15) return;
 
     p.caffeine = Math.max(0, p.caffeine - 15);
-    p.dashTimer = 0.18;
-    p.dashCooldown = 0.65;
-    p.vx = p.facing * 680;
+    p.dashTimer = 0.19;
+    p.dashCooldown = 0.58;
+    p.vx = p.facing * 730;
     p.vy = 0;
+    // Extreme horizontal aerodynamic dash stretch!
+    this.impulseScale(1.42, 0.66, 0);
     sound.playJump(true);
-    this.spawnCoffeeSplash(p.x, p.y, 14, '#fde047');
+    this.spawnCoffeeSplash(p.x, p.y, 16, '#fde047');
     this.syncHud();
   }
 
@@ -305,6 +337,7 @@ export class CoffeePlatformerEngine {
     if (p.shieldActive) {
       p.shieldActive = false;
       p.invulnTimer = 1.4;
+      this.impulseScale(1.3, 0.75, 2.5);
       sound.playSugarCrumble();
       this.addFloatingText(p.x, p.y - 30, 'NITRO SHIELD BLOCKED!', '#f472b6');
       this.spawnCoffeeSplash(p.x, p.y, 18, '#f472b6');
@@ -314,8 +347,9 @@ export class CoffeePlatformerEngine {
 
     p.hp--;
     p.invulnTimer = 1.5;
-    p.vy = -380;
-    p.vx = -p.facing * 240;
+    p.vy = -410;
+    p.vx = -p.facing * 250;
+    this.impulseScale(0.65, 1.38, 4.0);
     this.shakeTimer = 0.25;
     this.shakeIntensity = 9;
     sound.playHurt();
@@ -352,6 +386,7 @@ export class CoffeePlatformerEngine {
     if (p.dashTimer > 0) p.dashTimer -= dt;
     if (p.dashCooldown > 0) p.dashCooldown -= dt;
     if (p.coyoteTimer > 0) p.coyoteTimer -= dt;
+    if (p.jumpBufferTimer > 0) p.jumpBufferTimer -= dt;
     if (this.shakeTimer > 0) this.shakeTimer -= dt;
 
     if (this.comboTimer > 0) {
@@ -363,43 +398,70 @@ export class CoffeePlatformerEngine {
     const regenRate = this.unlockedPowerups.has('golden_boost') ? 9 : 4.5;
     p.caffeine = Math.min(100, p.caffeine + regenRate * dt);
 
-    // Horizontal Movement
+    // Snappy AAA Platformer Horizontal Movement with Turnaround Boost
     const moveLeft = this.keys.has('ArrowLeft') || this.keys.has('KeyA');
     const moveRight = this.keys.has('ArrowRight') || this.keys.has('KeyD');
 
     if (p.dashTimer <= 0) {
-      const accel = p.onGround ? 1900 : 1250;
-      const maxSpeed = 330;
+      const baseAccel = p.onGround ? 2350 : 1550;
+      const maxSpeed = 355;
 
       if (moveLeft) {
-        p.vx = Math.max(p.vx - accel * dt, -maxSpeed);
+        // Extra snappy turnaround impulse when reversing direction!
+        const turnBoost = p.vx > 40 ? 2.1 : 1.0;
+        if (p.facing === 1 && p.onGround) {
+          this.impulseScale(1.18, 0.85, 1.2);
+          this.spawnCoffeeSplash(p.x + 12, p.y + 20, 4, '#fde68a');
+        }
+        p.vx = Math.max(p.vx - baseAccel * turnBoost * dt, -maxSpeed);
         p.facing = -1;
       } else if (moveRight) {
-        p.vx = Math.min(p.vx + accel * dt, maxSpeed);
+        const turnBoost = p.vx < -40 ? 2.1 : 1.0;
+        if (p.facing === -1 && p.onGround) {
+          this.impulseScale(1.18, 0.85, 1.2);
+          this.spawnCoffeeSplash(p.x - 12, p.y + 20, 4, '#fde68a');
+        }
+        p.vx = Math.min(p.vx + baseAccel * turnBoost * dt, maxSpeed);
         p.facing = 1;
       } else {
-        const friction = p.onGround ? 0.82 : 0.93;
+        const friction = p.onGround ? 0.78 : 0.92;
         p.vx *= Math.pow(friction, dt * 60);
-        if (Math.abs(p.vx) < 8) p.vx = 0;
+        if (Math.abs(p.vx) < 10) p.vx = 0;
       }
 
-      // Gravity
-      p.vy += 1380 * dt;
-      if (p.vy > 780) p.vy = 780;
+      // Dynamic Gravity: Lighter at jump apex for ultra-satisfying hang time, punchier on descent
+      const isNearApex = !p.onGround && Math.abs(p.vy) < 115;
+      const gravityMult = isNearApex ? 0.68 : p.vy > 80 ? 1.18 : 1.0;
+      p.vy += 1420 * gravityMult * dt;
+      if (p.vy > 820) p.vy = 820;
+    } else if (Math.random() < 0.75) {
+      // Frothy dash trail particles
+      this.particles.push({
+        x: p.x - p.facing * 18,
+        y: p.y + (Math.random() - 0.5) * 20,
+        vx: -p.facing * 90,
+        vy: (Math.random() - 0.5) * 40,
+        r: 4 + Math.random() * 5,
+        color: '#fef08a',
+        life: 0.25,
+        maxLife: 0.25,
+        gravity: 0
+      });
     }
 
     // Integrate position
     const prevY = p.y;
+    const impactVy = p.vy;
     p.x += p.vx * dt;
     p.y += p.vy * dt;
 
     // World boundaries
-    if (p.x < 30) {
-      p.x = 30;
+    if (p.x < 35) {
+      p.x = 35;
       p.vx = 0;
     }
-    if (p.x > this.level.width - 40) {
-      p.x = this.level.width - 40;
+    if (p.x > this.level.width - 45) {
+      p.x = this.level.width - 45;
     }
 
     // Platform Collisions (One-way top landing + solid standing)
@@ -407,31 +469,42 @@ export class CoffeePlatformerEngine {
     p.onGround = false;
 
     for (const plat of this.level.platforms) {
-      const withinX = p.x + p.r * 0.75 > plat.x && p.x - p.r * 0.75 < plat.x + plat.w;
-      const crossedTop = prevY + p.r <= plat.y + 14 && p.y + p.r >= plat.y && p.vy >= 0;
+      const withinX = p.x + p.r * 0.76 > plat.x && p.x - p.r * 0.76 < plat.x + plat.w;
+      const crossedTop = prevY + p.r <= plat.y + 16 && p.y + p.r >= plat.y && p.vy >= 0;
 
       if (withinX && crossedTop) {
         p.y = plat.y - p.r;
         p.vy = 0;
         p.onGround = true;
-        p.coyoteTimer = 0.12;
+        p.coyoteTimer = 0.14;
         p.jumpsRemaining = this.unlockedPowerups.has('golden_boost') ? 2 : 1;
 
         if (!wasOnGround) {
-          p.scaleX = 1.24;
-          p.scaleY = 0.78;
+          // Impact-proportional landing squash & spring bounce!
+          const impactFactor = Math.min(1, Math.max(0.25, impactVy / 650));
+          const squashX = 1 + 0.36 * impactFactor;
+          const squashY = 1 - 0.30 * impactFactor;
+          this.impulseScale(squashX, squashY, -3.5 * impactFactor);
+
           if (plat.type === 'sugar_cube') {
             sound.playSugarCrumble();
-            this.spawnCoffeeSplash(p.x, plat.y, 7, '#bae6fd');
+            this.spawnCoffeeSplash(p.x, plat.y, 8, '#bae6fd');
+          } else if (impactFactor > 0.55) {
+            this.spawnCoffeeSplash(p.x, plat.y, 6, '#fde68a');
           }
+        }
+
+        // Execute buffered jump immediately on touchdown for frame-perfect responsiveness!
+        if (p.jumpBufferTimer > 0) {
+          this.triggerJump();
         }
 
         // Checkpoint activation
         if (plat.isCheckpoint && p.checkpointX < plat.x) {
           p.checkpointX = plat.x + 80;
-          p.checkpointY = plat.y - 30;
+          p.checkpointY = plat.y - 34;
           p.shieldActive = this.unlockedPowerups.has('nitro_shield');
-          this.addFloatingText(p.x, p.y - 45, `CHECKPOINT: ${plat.checkpointName.toUpperCase()}!`, '#fde047');
+          this.addFloatingText(p.x, p.y - 48, `CHECKPOINT: ${plat.checkpointName.toUpperCase()}!`, '#fde047');
           sound.playProductUnlock();
         }
 
@@ -452,21 +525,48 @@ export class CoffeePlatformerEngine {
     }
 
     if (wasOnGround && !p.onGround && p.vy >= 0) {
-      p.coyoteTimer = 0.12;
+      p.coyoteTimer = 0.14;
     }
 
     // Liquid Hazard check (Falling into Milk Rapids or Boiling Crema Lake)
     if (p.y + p.r > this.level.liquidLevel + 12) {
       this.hurtPlayer();
-      p.y = p.checkpointY - 30;
+      p.y = p.checkpointY - 34;
       p.x = p.checkpointX;
       p.vx = 0;
       p.vy = 0;
     }
 
-    // Smoothly restore squash & stretch
-    p.scaleX += (1 - p.scaleX) * 14 * dt;
-    p.scaleY += (1 - p.scaleY) * 14 * dt;
+    // --- Harmonic Spring-Damper Squash & Stretch + Liquid Slosh Physics ---
+    // While airborne, target scale subtly stretches with vertical velocity; on ground, target is 1.0 with a lively run bounce
+    const runBounce = p.onGround && Math.abs(p.vx) > 25
+      ? Math.sin(p.animTime * 18) * 0.065 * Math.min(1, Math.abs(p.vx) / 260)
+      : 0;
+    const airStretch = !p.onGround
+      ? Math.max(-0.12, Math.min(0.18, Math.abs(p.vy) / 1450))
+      : 0;
+
+    const targetSX = 1 - airStretch * 0.65 - runBounce;
+    const targetSY = 1 + airStretch + runBounce;
+
+    const stiffness = 240; // Spring stiffness (underdamped for juicy cartoon bounce)
+    const damping = 15.5;  // Spring damping
+
+    p.scaleVx += ((targetSX - p.scaleX) * stiffness - p.scaleVx * damping) * dt;
+    p.scaleVy += ((targetSY - p.scaleY) * stiffness - p.scaleVy * damping) * dt;
+    p.scaleX = Math.max(0.55, Math.min(1.5, p.scaleX + p.scaleVx * dt));
+    p.scaleY = Math.max(0.55, Math.min(1.5, p.scaleY + p.scaleVy * dt));
+
+    // Smooth velocity-driven tilt & internal coffee slosh oscillator
+    const targetTilt = p.onGround
+      ? (p.vx / 355) * 0.11 * p.facing
+      : Math.max(-0.18, Math.min(0.18, (p.vy * 0.00028))) * p.facing;
+    p.tiltAngle += (targetTilt - p.tiltAngle) * 14 * dt;
+
+    const sloshTarget = -p.vx * 0.015;
+    p.sloshVel += ((sloshTarget - p.sloshAngle) * 120 - p.sloshVel * 8) * dt;
+    p.sloshAngle += p.sloshVel * dt;
+
     p.animTime += dt;
 
     // Ambient rising steam & coffee droplets from the hero cup!
@@ -576,9 +676,8 @@ export class CoffeePlatformerEngine {
         if (p.dashTimer > 0 && this.unlockedPowerups.has('nitro_shield')) {
           this.damageEnemy(enemy, 2, p.facing * 260);
         } else if (isStomping) {
-          p.vy = -480;
-          p.scaleX = 1.25;
-          p.scaleY = 0.75;
+          p.vy = -525;
+          this.impulseScale(1.36, 0.72, 4.2);
           this.damageEnemy(enemy, 1, 0);
         } else {
           this.hurtPlayer();

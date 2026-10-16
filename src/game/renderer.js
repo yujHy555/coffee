@@ -1657,11 +1657,11 @@ export class WorldRenderer {
     ctx.save();
     ctx.translate(sx, sy);
 
-    // Warm ground shadow beneath protagonist when near ground (Matches Character Design Sheet!)
+    // Subtle, much smaller ground contact shadow beneath the protagonist's boots
     if (player.onGround) {
-      ctx.fillStyle = 'rgba(42, 18, 6, 0.26)';
+      ctx.fillStyle = 'rgba(42, 18, 6, 0.2)';
       ctx.beginPath();
-      ctx.ellipse(0, 27, 26, 6, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 29, 12, 2.6, 0, 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -1674,65 +1674,69 @@ export class WorldRenderer {
     if (unlockedPowerups.has('nitro_shield') && player.shieldActive) {
       ctx.strokeStyle = 'rgba(244, 114, 182, 0.78)';
       ctx.fillStyle = 'rgba(251, 207, 232, 0.2)';
-      ctx.lineWidth = 2.8;
+      ctx.lineWidth = 2.2;
       ctx.beginPath();
-      ctx.arc(0, -4, 40 + Math.sin(time * 6) * 3, 0, Math.PI * 2);
+      ctx.arc(0, -4, 46 + Math.sin(time * 6) * 3, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     }
 
     // Smoothly blend between FRONT VIEW (0) when idle and SIDE VIEW (1) when running/jumping/attacking
-    // Matches the exact COFFEE CUP (CHARACTER DESIGN) sheet!
     const speedRatio = Math.min(1, Math.abs(player.vx) / 135);
     const isAction = !player.onGround || player.meleeTimer > 0 || player.shotCooldown > 0.1;
     const sideMix = isAction ? Math.max(0.82, speedRatio) : speedRatio * 0.9;
 
     ctx.scale(player.facing, 1);
 
-    // Dynamic squash & stretch + subtle run lean
-    const tilt = player.vx * 0.00035 * player.facing;
+    // Anchor squash & stretch at the bottom of the boots (+28px) so the cup compresses into the ground
+    // and springs upward from its feet, plus slightly larger overall hero scale (1.18x)!
+    const heroScale = 1.18;
+    const tilt = player.tiltAngle !== undefined ? player.tiltAngle : player.vx * 0.00038 * player.facing;
+
+    ctx.translate(0, 28);
     ctx.rotate(tilt);
-    ctx.scale(player.scaleX, player.scaleY);
+    ctx.scale(player.scaleX * heroScale, player.scaleY * heroScale);
+    ctx.translate(0, -28);
 
     const outlineCol = '#432212';
 
     const runSwing = player.onGround
-      ? Math.sin(player.animTime * 15) * Math.min(1, Math.abs(player.vx) / 170)
-      : -0.55;
+      ? Math.sin(player.animTime * 16) * Math.min(1, Math.abs(player.vx) / 160)
+      : -0.58;
 
-    // --- 1. Far/Reaching Arm (In FRONT VIEW: cheerful raised waving arm on the cup's side; In SIDE VIEW: extends forward from the front edge!) ---
+    // --- 1. Far/Reaching Arm (In FRONT VIEW: cheerful raised waving arm; In SIDE VIEW: extends forward with secondary bounce!) ---
     ctx.save();
     const waveX = (1 - sideMix) * -23 + sideMix * 19;
-    const waveY = (1 - sideMix) * 1 + sideMix * 3;
+    const waveY = (1 - sideMix) * 1 + sideMix * 3 + (player.scaleY - 1) * -4;
     ctx.translate(waveX, waveY);
     this.drawProtagonistArm(
       ctx,
       sideMix > 0.45 ? 1 : -1,
-      true, // Waving / reaching open 4-finger hand from the new sheet!
+      true,
       false,
       0,
       false,
-      runSwing * 0.35 + Math.sin(time * 6) * 0.08
+      runSwing * 0.42 + Math.sin(time * 6.5) * 0.09
     );
     ctx.restore();
 
-    // --- 2. Legs & Cuffed Red Boots (Exact match to COFFEE CUP Character Design Sheet!) ---
-    const stride = runSwing * 10;
+    // --- 2. Legs & Cuffed Red Boots (With thinner, ultra-crisp linework!) ---
+    const stride = runSwing * 11;
     const leftLegX = -8 + sideMix * 5 + stride;
     const rightLegX = 8 - sideMix * 3 - stride;
 
     // Far/Back Boot
     this.drawCupBoot(
       leftLegX,
-      20 - Math.max(0, -runSwing) * 4,
-      -runSwing * 0.38,
+      20 - Math.max(0, -runSwing) * 4.5,
+      -runSwing * 0.42,
       0.25 + sideMix * 0.65
     );
     // Near/Front Boot
     this.drawCupBoot(
       rightLegX,
-      21 - Math.max(0, runSwing) * 4,
-      runSwing * 0.38,
+      21 - Math.max(0, runSwing) * 4.5,
+      runSwing * 0.42,
       0.35 + sideMix * 0.65
     );
 
@@ -1742,7 +1746,7 @@ export class WorldRenderer {
       ctx.translate(23, -1);
       ctx.fillStyle = '#E8CFB0';
       ctx.strokeStyle = outlineCol;
-      ctx.lineWidth = 3.4;
+      ctx.lineWidth = 2.0;
       ctx.beginPath();
       ctx.arc(0, 0, 11.5, -Math.PI * 0.55, Math.PI * 0.55);
       ctx.closePath();
@@ -1758,11 +1762,11 @@ export class WorldRenderer {
       ctx.restore();
     }
 
-    // --- 4. Wide Rounded Cream Porcelain Cup Body (Exact COFFEE CUP Sheet Proportions & Shading) ---
+    // --- 4. Wide Rounded Cream Porcelain Cup Body (Thinner, refined linework) ---
     ctx.save();
     ctx.fillStyle = '#F5E3C8';
     ctx.strokeStyle = outlineCol;
-    ctx.lineWidth = 3.5;
+    ctx.lineWidth = 2.1;
     ctx.lineJoin = 'round';
 
     ctx.beginPath();
@@ -1787,7 +1791,7 @@ export class WorldRenderer {
     ctx.closePath();
     ctx.fill();
 
-    // Glossy white vertical highlight on the leading/front curve (Exact match to both FRONT & SIDE views!)
+    // Glossy white vertical highlight on the leading/front curve
     ctx.fillStyle = 'rgba(255, 252, 245, 0.88)';
     ctx.beginPath();
     ctx.ellipse(-16 + sideMix * 33, -2, 3.6, 11, -0.08, 0, Math.PI * 2);
@@ -1795,9 +1799,9 @@ export class WorldRenderer {
 
     ctx.restore();
 
-    // Re-stroke outer cup contour cleanly
+    // Re-stroke outer cup contour cleanly with refined thin linework
     ctx.strokeStyle = outlineCol;
-    ctx.lineWidth = 3.5;
+    ctx.lineWidth = 2.1;
     ctx.beginPath();
     ctx.moveTo(-25, -16);
     ctx.lineTo(25, -16);
@@ -1806,10 +1810,10 @@ export class WorldRenderer {
     ctx.closePath();
     ctx.stroke();
 
-    // --- 5. Thick Ceramic Top Rim, Bubbly Crema Foam & Dynamic Splash Crown (Exact match to COFFEE CUP Sheet!) ---
+    // --- 5. Thick Ceramic Top Rim, Bubbly Crema Foam & Dynamic Slosh-Reactive Splash Crown ---
     ctx.fillStyle = '#FFF6E8';
     ctx.strokeStyle = outlineCol;
-    ctx.lineWidth = 3.3;
+    ctx.lineWidth = 2.0;
     ctx.beginPath();
     ctx.ellipse(0, -16, 25, 7.2, 0, 0, Math.PI * 2);
     ctx.fill();
@@ -1820,30 +1824,30 @@ export class WorldRenderer {
     ctx.ellipse(0, -15.5, 21.5, 5.2, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Rich roast coffee surface
-    const slosh = Math.sin(time * 9) * 2.2;
+    // Rich roast coffee surface reactive to player.sloshAngle
+    const slosh = Math.sin(time * 9.5) * 2.2 + (player.sloshAngle || 0) * 0.45;
     ctx.fillStyle = '#5A2E17';
     ctx.strokeStyle = outlineCol;
-    ctx.lineWidth = 2.2;
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.ellipse(0, -15.2, 20.5, 4.6, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
-    // Sculpted Bubbly Sloshing Coffee Wave & Crema Bubbles inside the rim (Shown in both FRONT & SIDE views of the new sheet!)
+    // Sculpted Bubbly Sloshing Coffee Wave & Crema Bubbles inside the rim
     ctx.fillStyle = '#6E381D';
     ctx.strokeStyle = outlineCol;
-    ctx.lineWidth = 2.1;
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(-18, -15.5);
-    ctx.quadraticCurveTo(-11, -21 + slosh * 0.6, -3, -17);
-    ctx.quadraticCurveTo(6, -24 - slosh * 0.8, 12, -26 - Math.abs(slosh));
+    ctx.quadraticCurveTo(-11, -21 + slosh * 0.7, -3, -17);
+    ctx.quadraticCurveTo(6, -24 - slosh * 0.9, 12, -26 - Math.min(6, Math.abs(slosh)));
     ctx.quadraticCurveTo(18, -27, 16, -15.5);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
 
-    // Crema foam bubbles on the coffee surface (Exact detail from sheet!)
+    // Crema foam bubbles on the coffee surface
     const bubbles = [
       { bx: -11, by: -16.5, br: 2.3 },
       { bx: -6, by: -15.2, br: 1.6 },
@@ -1853,14 +1857,14 @@ export class WorldRenderer {
     bubbles.forEach((b) => {
       ctx.fillStyle = '#C88A5A';
       ctx.strokeStyle = outlineCol;
-      ctx.lineWidth = 1.3;
+      ctx.lineWidth = 1.0;
       ctx.beginPath();
       ctx.arc(b.bx, b.by, b.br, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     });
 
-    // Airborne Coffee Droplets & S-Curved Steam Plume above the cup (Exact match to FRONT/SIDE/BACK sheet!)
+    // Airborne Coffee Droplets & S-Curved Steam Plume above the cup
     ctx.save();
     const steamWiggle = Math.sin(time * 3.5) * 4;
     const steamGrad = ctx.createLinearGradient(0, -20, 0, -68);
@@ -1877,33 +1881,34 @@ export class WorldRenderer {
     ctx.restore();
 
     const dropOffsets = [
-      { dx: -10, dy: -26, r: 2.4 },
-      { dx: -2, dy: -31, r: 2.9 },
-      { dx: 11, dy: -32, r: 2.2 },
-      { dx: 18, dy: -25, r: 1.8 }
+      { dx: -10, dy: -26, r: 2.3 },
+      { dx: -2, dy: -31, r: 2.7 },
+      { dx: 11, dy: -32, r: 2.1 },
+      { dx: 18, dy: -25, r: 1.7 }
     ];
     dropOffsets.forEach((d, idx) => {
-      const bounce = Math.sin(time * 10 + idx * 1.4) * 2.5;
+      const bounce = Math.sin(time * 11 + idx * 1.4) * 2.8 + (player.scaleY - 1) * -8;
       ctx.fillStyle = '#6E381D';
       ctx.strokeStyle = outlineCol;
-      ctx.lineWidth = 1.6;
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
       ctx.arc(d.dx, d.dy + bounce, d.r, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     });
 
-    // --- 6. Character Sheet Face (Shifts smoothly from Center FRONT VIEW to Leading Edge in SIDE VIEW) ---
+    // --- 6. Character Sheet Face (With expressive squash/stretch eye & mouth reactions!) ---
     const faceShiftX = sideMix * 11.5;
+    const faceFollowY = (player.scaleY - 1) * -3.5;
     ctx.save();
-    ctx.translate(faceShiftX, 0);
+    ctx.translate(faceShiftX, faceFollowY);
 
     // Left/Near Eye
     const leftEyeX = -9.5 + sideMix * 5.5;
     const leftEyeScaleX = 1 - sideMix * 0.22;
     ctx.fillStyle = outlineCol;
     ctx.beginPath();
-    ctx.ellipse(leftEyeX, -1.5, 3.3 * leftEyeScaleX, 3.9, 0, 0, Math.PI * 2);
+    ctx.ellipse(leftEyeX, -1.5, 3.2 * leftEyeScaleX, 3.9, 0, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.fillStyle = '#FFFFFF';
@@ -1911,13 +1916,13 @@ export class WorldRenderer {
     ctx.arc(leftEyeX + 0.9 * leftEyeScaleX, -2.8, 1.25 * leftEyeScaleX, 0, Math.PI * 2);
     ctx.fill();
 
-    // Right/Far Eye (Visible in FRONT view, wraps onto the leading profile edge in SIDE view)
+    // Right/Far Eye
     if (sideMix < 0.78) {
       const rightEyeX = 9.5 - sideMix * 1.5;
       const rightEyeScaleX = 1 - sideMix * 0.35;
       ctx.fillStyle = outlineCol;
       ctx.beginPath();
-      ctx.ellipse(rightEyeX, -1.5, 3.3 * rightEyeScaleX, 3.9, 0, 0, Math.PI * 2);
+      ctx.ellipse(rightEyeX, -1.5, 3.2 * rightEyeScaleX, 3.9, 0, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = '#FFFFFF';
@@ -1944,7 +1949,7 @@ export class WorldRenderer {
     ctx.translate(mouthX, 2.2);
     ctx.fillStyle = '#4A2112';
     ctx.strokeStyle = outlineCol;
-    ctx.lineWidth = 2.1;
+    ctx.lineWidth = 1.4;
     ctx.beginPath();
     ctx.moveTo(-3.8 * (1 - sideMix * 0.25), -0.5);
     ctx.quadraticCurveTo(0, 0.8, 3.8, -0.5);
@@ -1961,14 +1966,13 @@ export class WorldRenderer {
 
     ctx.restore(); // end face group
 
-    // --- 7. Foreground Foreshortened C-Handle on the Side of the Cup in SIDE VIEW! ---
-    // (Matches the exact middle illustration of your COFFEE CUP Character Design Sheet!)
+    // --- 7. Foreground Foreshortened C-Handle on the Side of the Cup in SIDE VIEW (Thinner linework) ---
     if (sideMix >= 0.55) {
       ctx.save();
       ctx.translate(-9, -1);
       ctx.fillStyle = '#E8CFB0';
       ctx.strokeStyle = outlineCol;
-      ctx.lineWidth = 3.2;
+      ctx.lineWidth = 2.0;
       ctx.beginPath();
       ctx.roundRect(-4.5, -11.5, 9, 23, 4.5);
       ctx.fill();
@@ -1976,7 +1980,7 @@ export class WorldRenderer {
 
       // Inner handle groove
       ctx.strokeStyle = '#C9AC86';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1.4;
       ctx.beginPath();
       ctx.moveTo(0, -7);
       ctx.lineTo(0, 7);
@@ -1988,7 +1992,7 @@ export class WorldRenderer {
     ctx.save();
     const spoonUpgraded = unlockedPowerups.has('silver_spoon');
     const nearArmX = (1 - sideMix) * 21 + sideMix * 2;
-    const nearArmY = (1 - sideMix) * 4 + sideMix * 8;
+    const nearArmY = (1 - sideMix) * 4 + sideMix * 8 + (player.scaleY - 1) * -3;
 
     ctx.translate(nearArmX, nearArmY);
     this.drawProtagonistArm(
@@ -1998,7 +2002,7 @@ export class WorldRenderer {
       player.meleeTimer > 0,
       player.meleeTimer,
       spoonUpgraded,
-      -runSwing * 0.35
+      -runSwing * 0.42
     );
     ctx.restore();
 
@@ -2018,7 +2022,7 @@ export class WorldRenderer {
       ctx.rotate(swingAngle);
 
       ctx.strokeStyle = limbCol;
-      ctx.lineWidth = 4.2;
+      ctx.lineWidth = 3.2;
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(0, 0);
@@ -2028,7 +2032,7 @@ export class WorldRenderer {
       // Silver or Golden Barista Spoon
       ctx.fillStyle = spoonUpgraded ? '#fde047' : '#e2e8f0';
       ctx.strokeStyle = '#1e293b';
-      ctx.lineWidth = 2.2;
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
       ctx.roundRect(14, -24, 4, 23, 2);
       ctx.fill();
@@ -2041,16 +2045,16 @@ export class WorldRenderer {
 
       // Slash wave trail
       ctx.strokeStyle = spoonUpgraded ? 'rgba(250, 204, 21, 0.9)' : 'rgba(186, 230, 253, 0.85)';
-      ctx.lineWidth = spoonUpgraded ? 9 : 6;
+      ctx.lineWidth = spoonUpgraded ? 8 : 5.5;
       ctx.beginPath();
       ctx.arc(0, 0, spoonUpgraded ? 48 : 35, -1.25, 1.15);
       ctx.stroke();
     } else if (isWaving) {
-      // Exact Raised Waving / Reaching 4-Finger Hand from COFFEE CUP Character Design Sheet!
-      ctx.rotate(walkSwing * 0.35);
+      // Exact Raised Waving / Reaching 4-Finger Hand with refined thinner linework!
+      ctx.rotate(walkSwing * 0.38);
 
       ctx.strokeStyle = outlineCol;
-      ctx.lineWidth = 5.4;
+      ctx.lineWidth = 3.8;
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(0, 0);
@@ -2058,7 +2062,7 @@ export class WorldRenderer {
       ctx.stroke();
 
       ctx.strokeStyle = limbCol;
-      ctx.lineWidth = 3.6;
+      ctx.lineWidth = 2.6;
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.quadraticCurveTo(dir * 9, -2, dir * 13, -11);
@@ -2067,30 +2071,29 @@ export class WorldRenderer {
       // Cute spread 4-fingered hand
       ctx.fillStyle = limbCol;
       ctx.strokeStyle = outlineCol;
-      ctx.lineWidth = 1.8;
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
-      ctx.arc(dir * 14, -12, 3.6, 0, Math.PI * 2);
+      ctx.arc(dir * 14, -12, 3.4, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
-      // Little spread fingers
       const fingerAngles = [-0.6, -0.15, 0.3];
       fingerAngles.forEach((fa) => {
         ctx.save();
         ctx.translate(dir * 14, -12);
         ctx.rotate(fa * dir);
         ctx.beginPath();
-        ctx.roundRect(dir > 0 ? 1 : -5.5, -2.5, 4.5, 2.2, 1);
+        ctx.roundRect(dir > 0 ? 1 : -5.2, -2.3, 4.2, 2.0, 1);
         ctx.fill();
         ctx.stroke();
         ctx.restore();
       });
     } else {
-      // Exact Curved Lower Arm from SIDE/FRONT View of COFFEE CUP Sheet
+      // Exact Curved Lower Arm with refined thinner linework
       ctx.rotate(walkSwing);
 
       ctx.strokeStyle = outlineCol;
-      ctx.lineWidth = 5.2;
+      ctx.lineWidth = 3.8;
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(0, 0);
@@ -2098,7 +2101,7 @@ export class WorldRenderer {
       ctx.stroke();
 
       ctx.strokeStyle = limbCol;
-      ctx.lineWidth = 3.4;
+      ctx.lineWidth = 2.6;
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.quadraticCurveTo(dir * 3, 7, dir * 10, 4);
@@ -2106,9 +2109,9 @@ export class WorldRenderer {
 
       ctx.fillStyle = limbCol;
       ctx.strokeStyle = outlineCol;
-      ctx.lineWidth = 1.8;
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
-      ctx.arc(dir * 11, 3.8, 3.2, 0, Math.PI * 2);
+      ctx.arc(dir * 11, 3.8, 3.0, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     }
@@ -2126,9 +2129,9 @@ export class WorldRenderer {
     const bootRed = '#C63B33';
     const bootShadow = '#9E2A24';
 
-    // Dark brown stick leg
+    // Dark brown stick leg (thinner, refined linework)
     ctx.strokeStyle = outlineCol;
-    ctx.lineWidth = 5.4;
+    ctx.lineWidth = 3.8;
     ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(0, -8);
@@ -2136,17 +2139,17 @@ export class WorldRenderer {
     ctx.stroke();
 
     ctx.strokeStyle = limbCol;
-    ctx.lineWidth = 3.4;
+    ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.moveTo(0, -8);
     ctx.lineTo(0, 2);
     ctx.stroke();
 
-    // Red Boot Shaft & Rounded Toe (Matches Character Sheet!)
+    // Red Boot Shaft & Rounded Toe (thinner outline)
     const toeExt = 5 + toeProfile * 4.5;
     ctx.fillStyle = bootRed;
     ctx.strokeStyle = outlineCol;
-    ctx.lineWidth = 2.6;
+    ctx.lineWidth = 1.7;
     ctx.lineJoin = 'round';
 
     ctx.beginPath();
