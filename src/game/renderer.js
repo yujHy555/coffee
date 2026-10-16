@@ -1761,9 +1761,17 @@ export class WorldRenderer {
     const hipShiftX = idleBlend * -1.4;
     const hipBobY = idleBlend * Math.abs(Math.sin(time * 9.5)) * 0.9;
 
-    // --- 1. Far/Left Arm (In IDLE: Hand on waist! In AIR: Dangles & trails with velocity! On GROUND: Waves/swings!) ---
+    // --- 1. Far/Left Arm (When shooting: supports the Black Glock with 2 hands! When idle: hand on waist! In air: dangles!) ---
+    const hasGun = Boolean(player.hasBeanGun);
+    const isShooting = (player.gunShootTimer || 0) > 0 && hasGun;
+
     ctx.save();
-    if (idleBlend > 0.5 && !isAction) {
+    if (isShooting) {
+      // Two-handed tactical shooting stance: Left arm reaches forward to cup under the Glock grip!
+      const nearArmX = (1 - sideMix) * 21 + sideMix * 2;
+      const nearArmY = (1 - sideMix) * 4 + sideMix * 8;
+      this.drawSupportArm(ctx, nearArmX, nearArmY, sideMix, player.gunShootTimer || 0);
+    } else if (idleBlend > 0.5 && !isAction) {
       // Left arm bent akimbo with hand planted firmly on the left waist/hip of the cup!
       this.drawWaistArm(ctx, -1, tapLift, hipShiftX, hipBobY);
     } else {
@@ -2203,11 +2211,9 @@ export class WorldRenderer {
     ctx.restore(); // end cup body + face group
     ctx.restore(); // end hipShift group
 
-    // --- 8. Near/Right Arm (Holding Bean Blaster Gun when equipped, Spoon when meleeing, or swinging/waist) ---
+    // --- 8. Near/Right Arm (Holding Black Glock 16mm when equipped, Spoon when meleeing, or swinging/waist) ---
     ctx.save();
     const spoonUpgraded = unlockedPowerups.has('silver_spoon');
-    const isShooting = (player.gunShootTimer || 0) > 0;
-    const hasGun = Boolean(player.hasBeanGun);
 
     if (idleBlend > 0.5 && !isAction && player.meleeTimer <= 0 && !isShooting && !hasGun) {
       // Right arm bent akimbo with hand planted firmly on the right waist/hip of the cup!
@@ -2284,6 +2290,59 @@ export class WorldRenderer {
     ctx.restore();
   }
 
+  // Two-handed tactical shooting stance: Left/Far Arm extends across chest to support the Black Glock 16mm!
+  drawSupportArm(ctx, targetHandX, targetHandY, sideMix, gunShootTimer) {
+    const limbCol = '#522915';
+    const outlineCol = '#3A1B0C';
+    const recoilProg = gunShootTimer / 0.22;
+    const kickX = -recoilProg * 6;
+
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const shoulderX = -12 + sideMix * 14;
+    const shoulderY = 1.5;
+    const endX = targetHandX + kickX - 2.5;
+    const endY = targetHandY + 3.8;
+    const ctrlX = shoulderX + 11;
+    const ctrlY = shoulderY + 8;
+
+    // Dark contour of left arm extending across chest
+    ctx.strokeStyle = outlineCol;
+    ctx.lineWidth = 3.6;
+    ctx.beginPath();
+    ctx.moveTo(shoulderX, shoulderY);
+    ctx.quadraticCurveTo(ctrlX, ctrlY, endX, endY);
+    ctx.stroke();
+
+    // Espresso arm fill
+    ctx.strokeStyle = limbCol;
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(shoulderX, shoulderY);
+    ctx.quadraticCurveTo(ctrlX, ctrlY, endX, endY);
+    ctx.stroke();
+
+    // Left support hand cupping firmly under the Glock grip & right hand
+    ctx.fillStyle = limbCol;
+    ctx.strokeStyle = outlineCol;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.ellipse(endX, endY, 3.6, 2.8, 0.35, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Support fingers wrapping under the base of the grip
+    ctx.beginPath();
+    ctx.arc(endX + 2, endY - 1, 1.6, 0, Math.PI * 2);
+    ctx.arc(endX + 3.5, endY + 0.8, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
   drawProtagonistArm(
     ctx,
     dir,
@@ -2340,7 +2399,7 @@ export class WorldRenderer {
       ctx.stroke();
     } else if (hasGun) {
       // =========================================================================
-      // EQUIPPED BEAN BLASTER GUN (Shooting stance with recoil & muzzle flash)
+      // EQUIPPED BLACK GLOCK 16mm (Shooting stance with recoil & awesome muzzle flash)
       // =========================================================================
       const recoilProg = isShooting ? gunShootTimer / 0.22 : 0;
       const kickX = -recoilProg * 6;
@@ -2377,8 +2436,8 @@ export class WorldRenderer {
       ctx.fill();
       ctx.stroke();
 
-      // Draw the Bean Blaster Gun!
-      this.drawBeanBlasterGun(ctx, handX, handY, isShooting, recoilProg);
+      // Draw the Black Glock 16mm!
+      this.drawBlackGlock16mm(ctx, handX, handY, isShooting, recoilProg);
     } else if (isWaving) {
       // Raised Waving / Reaching 4-Finger Hand that dangles & trails loosely in mid-air!
       ctx.rotate(walkSwing * 0.45);
@@ -2731,104 +2790,207 @@ export class WorldRenderer {
   }
 
   // =========================================================================
-  // BEAN BLASTER GUN, WEAPON PICKUPS, BEAN PROJECTILES & PINK GOO SPLAT RENDERERS
+  // BLACK GLOCK 16mm, WEAPON PICKUPS, BEAN PROJECTILES & PINK GOO SPLATS
   // =========================================================================
 
-  drawBeanBlasterGun(ctx, x, y, isShooting, recoilProg) {
+  drawBlackGlock16mm(ctx, x, y, isShooting, recoilProg, time = 0) {
     ctx.save();
     ctx.translate(x, y);
-    ctx.rotate(isShooting ? -0.05 : -0.28);
 
-    const outlineCol = '#2D1407';
+    // Stance angle: level when shooting, tilted slightly up when ready
+    ctx.rotate(isShooting ? -0.06 : -0.22);
 
-    // 1. Sleek Porcelain Gun Handle & Body (#FFF6E8)
-    ctx.fillStyle = '#FFF6E8';
+    const slideKick = isShooting ? recoilProg * 5.0 : 0;
+    const outlineCol = '#090a0c';
+
+    // 1. Tactical Matte Black Polymer Lower Frame & Textured Grip
+    ctx.fillStyle = '#181a1f';
     ctx.strokeStyle = outlineCol;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.6;
     ctx.lineJoin = 'round';
     ctx.beginPath();
-    ctx.roundRect(-4, 0, 7, 10, 2);
+    ctx.moveTo(-4, 0);
+    ctx.lineTo(3.5, 0);
+    ctx.lineTo(2.5, 12);
+    ctx.quadraticCurveTo(-1.5, 13.5, -5.5, 11.5);
+    ctx.closePath();
     ctx.fill();
     ctx.stroke();
 
-    // 2. Brass Receiver Frame & Trigger Guard
-    ctx.fillStyle = '#E89A3C';
+    // Ergonomic grip stippling & finger groove
+    ctx.fillStyle = '#262931';
+    ctx.fillRect(-3, 3, 4.5, 2);
+    ctx.fillRect(-3.5, 6.5, 4.5, 2);
+
+    // Magazine baseplate bumper
+    ctx.fillStyle = '#111215';
     ctx.beginPath();
-    ctx.roundRect(0, -5, 16, 8, 2.5);
+    ctx.roundRect(-6, 11, 9.5, 2.5, 1);
     ctx.fill();
     ctx.stroke();
 
-    // Trigger loop
-    ctx.strokeStyle = outlineCol;
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.arc(4, 3, 3, 0, Math.PI * 0.85);
-    ctx.stroke();
-
-    // 3. Clear Glass Coffee Bean Magazine Hopper on Top (with mini roasted beans inside!)
-    ctx.fillStyle = 'rgba(186, 230, 253, 0.45)';
-    ctx.strokeStyle = '#38BDF8';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.roundRect(4, -12, 10, 7, 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Mini roasted coffee beans visible inside the glass magazine hopper
-    ctx.fillStyle = '#6E381D';
-    ctx.beginPath();
-    ctx.ellipse(7.5, -8.5, 2.2, 1.4, 0.2, 0, Math.PI * 2);
-    ctx.ellipse(10.5, -8.5, 2.0, 1.3, -0.3, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Golden magazine cap
-    ctx.fillStyle = '#FDE047';
-    ctx.strokeStyle = outlineCol;
-    ctx.lineWidth = 1.0;
-    ctx.fillRect(5, -14, 8, 2.2);
-    ctx.strokeRect(5, -14, 8, 2.2);
-
-    // 4. Ribbed Polished Brass Barrel & Ruby Nozzle
-    ctx.fillStyle = '#F59E0B';
+    // Squared Glock Trigger Guard
     ctx.strokeStyle = outlineCol;
     ctx.lineWidth = 1.4;
     ctx.beginPath();
-    ctx.roundRect(14, -4, 13, 6, 1.5);
-    ctx.fill();
+    ctx.moveTo(3, 2);
+    ctx.lineTo(7.2, 2);
+    ctx.lineTo(7.2, 7.5);
+    ctx.lineTo(1, 7.5);
     ctx.stroke();
 
-    // Ruby Nozzle Ring
-    ctx.fillStyle = '#E11D48';
+    // Silver Steel Trigger
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.roundRect(26, -5, 3.5, 8, 1.2);
+    ctx.moveTo(4.2, 3);
+    ctx.quadraticCurveTo(5, 5, 3.5, 6.5);
+    ctx.stroke();
+
+    // Frame accessory rail under the barrel
+    ctx.fillStyle = '#1a1c22';
+    ctx.strokeStyle = outlineCol;
+    ctx.lineWidth = 1.3;
+    ctx.fillRect(5, -1, 15, 3.2);
+    ctx.strokeRect(5, -1, 15, 3.2);
+
+    // 2. Silver Barrel Crown & Exposed Breach (revealed during slide blowback)
+    ctx.fillStyle = '#64748b';
+    ctx.fillRect(8, -6.5, 7, 5);
+    ctx.fillStyle = '#334155';
+    ctx.fillRect(20, -6, 5, 4.2);
+
+    // Ejected Brass Shell Casing flying out when firing!
+    if (isShooting && recoilProg > 0.08) {
+      const casingX = 11 - recoilProg * 14;
+      const casingY = -12 - recoilProg * 16;
+      ctx.save();
+      ctx.translate(casingX, casingY);
+      ctx.rotate(recoilProg * 8.5);
+      ctx.fillStyle = '#facc15';
+      ctx.strokeStyle = '#854d0e';
+      ctx.lineWidth = 1;
+      ctx.fillRect(-2, -3.5, 4, 7);
+      ctx.strokeRect(-2, -3.5, 4, 7);
+      // Tiny smoke wisp from ejection port
+      ctx.fillStyle = 'rgba(226, 232, 240, 0.45)';
+      ctx.beginPath();
+      ctx.arc(0, -6, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // 3. Angular Matte Black Glock Slide with Blowback Recoil Kick
+    ctx.save();
+    ctx.translate(-slideKick, 0);
+
+    // Deep matte black slide body
+    const slideGrad = ctx.createLinearGradient(0, -7.5, 0, -2);
+    slideGrad.addColorStop(0, '#262930');
+    slideGrad.addColorStop(0.35, '#16171a');
+    slideGrad.addColorStop(1, '#0e0f12');
+
+    ctx.fillStyle = slideGrad;
+    ctx.strokeStyle = outlineCol;
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'miter';
+    ctx.beginPath();
+    ctx.roundRect(-4.5, -7.5, 28, 6.5, 1);
     ctx.fill();
     ctx.stroke();
 
-    // 5. Muzzle Flash Starburst & Energy Discharge (when actively shooting!)
+    // Top bevel highlight line
+    ctx.strokeStyle = '#474c58';
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.moveTo(-3, -6.5);
+    ctx.lineTo(22, -6.5);
+    ctx.stroke();
+
+    // Rear slide cocking serrations (3 distinct vertical cut lines)
+    ctx.strokeStyle = '#090a0d';
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(-1.5, -6.5);
+    ctx.lineTo(-1.5, -2);
+    ctx.moveTo(1, -6.5);
+    ctx.lineTo(1, -2);
+    ctx.moveTo(3.5, -6.5);
+    ctx.lineTo(3.5, -2);
+    ctx.stroke();
+
+    // Laser-engraved Crisp Slide Marking: "GLOCK 16mm"
+    ctx.fillStyle = '#cbd5e1';
+    ctx.font = 'bold 3.8px system-ui, sans-serif';
+    ctx.fillText('GLOCK 16mm', 5.5, -3.2);
+
+    // White 3-Dot Combat Sights
+    // Rear Sight Notch with 2 white dots
+    ctx.fillStyle = '#0f1115';
+    ctx.fillRect(-3.8, -9.2, 3.2, 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(-3.4, -8.8, 1, 1);
+    ctx.fillRect(-1.8, -8.8, 1, 1);
+
+    // Front Sight Post with 1 white dot
+    ctx.fillStyle = '#0f1115';
+    ctx.fillRect(20, -9.0, 2.2, 1.8);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(20.5, -8.6, 1.2, 1.2);
+
+    ctx.restore(); // end slide blowback
+
+    // 4. Awesome Looking Tactical Muzzle Flash!
     if (isShooting && recoilProg > 0.05) {
-      const flashAlpha = Math.min(1, recoilProg * 1.5);
-      const flashScale = 0.8 + recoilProg * 0.8;
+      const flashAlpha = Math.min(1, recoilProg * 1.6);
+      const flashScale = 0.95 + recoilProg * 1.1;
+      const muzzleX = 26 - slideKick * 0.2;
+      const muzzleY = -4.5;
+
       ctx.save();
-      ctx.translate(32, -1);
+      ctx.translate(muzzleX, muzzleY);
       ctx.scale(flashScale, flashScale);
 
-      // Expanding pink-golden shock ring
-      ctx.strokeStyle = `rgba(244, 114, 182, ${flashAlpha * 0.85})`;
-      ctx.lineWidth = 2.0;
+      // Expanding fiery plasma shockwave ring
+      ctx.strokeStyle = `rgba(244, 63, 94, ${flashAlpha * 0.75})`;
+      ctx.lineWidth = 2.4;
       ctx.beginPath();
-      ctx.arc(0, 0, 9 + (1 - recoilProg) * 6, 0, Math.PI * 2);
+      ctx.arc(3, 0, 11 + (1 - recoilProg) * 7, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Bright 8-pointed cartoon muzzle flash star
-      this.drawFourPointSparkle(0, 0, 15, `rgba(253, 224, 71, ${flashAlpha})`);
-      ctx.rotate(Math.PI / 4);
-      this.drawFourPointSparkle(0, 0, 11, `rgba(244, 114, 182, ${flashAlpha * 0.9})`);
+      // Outer vivid fiery pink-orange flame petals
+      ctx.fillStyle = `rgba(251, 113, 133, ${flashAlpha * 0.88})`;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(16, -10);
+      ctx.lineTo(32, 0);
+      ctx.lineTo(16, 10);
+      ctx.closePath();
+      ctx.fill();
 
-      // Core white flash
+      // Multi-pointed incandescent tactical starburst
+      this.drawFourPointSparkle(8, 0, 24, `rgba(253, 224, 71, ${flashAlpha})`);
+      ctx.save();
+      ctx.rotate(Math.PI / 4);
+      this.drawFourPointSparkle(6, 0, 17, `rgba(249, 115, 22, ${flashAlpha * 0.9})`);
+      ctx.restore();
+
+      // Blazing white-hot core
       ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
       ctx.beginPath();
-      ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
+      ctx.ellipse(4, 0, 6.5, 3.5, 0, 0, Math.PI * 2);
       ctx.fill();
+
+      // Muzzle spark embers flying forward
+      const sparkColors = ['#fde047', '#fb7185', '#ffffff'];
+      for (let s = 0; s < 5; s++) {
+        const sx = 18 + s * 5;
+        const sy = (Math.sin(s * 2.3) * 8);
+        ctx.fillStyle = sparkColors[s % sparkColors.length];
+        ctx.beginPath();
+        ctx.arc(sx, sy, 1.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       ctx.restore();
     }
@@ -2867,26 +3029,26 @@ export class WorldRenderer {
     }
     ctx.restore();
 
-    // Floating 3D Gun Display
+    // Floating 3D Black Glock 16mm Display
     ctx.save();
     ctx.rotate(tilt);
     ctx.scale(1.4, 1.4);
-    this.drawBeanBlasterGun(ctx, -12, 0, false, 0);
+    this.drawBlackGlock16mm(ctx, -10, 0, false, 0);
     ctx.restore();
 
-    // Floating Label Pill: "★ BEAN BLASTER ★"
-    ctx.fillStyle = 'rgba(28, 14, 7, 0.88)';
+    // Floating Label Pill: "★ BLACK GLOCK 16mm ★"
+    ctx.fillStyle = 'rgba(17, 18, 22, 0.92)';
     ctx.strokeStyle = '#f472b6';
     ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.roundRect(-58, -38, 116, 19, 9);
+    ctx.roundRect(-66, -38, 132, 20, 9);
     ctx.fill();
     ctx.stroke();
 
     ctx.fillStyle = '#fde047';
     ctx.font = 'bold 10px system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('★ BEAN BLASTER ★', 0, -25);
+    ctx.fillText('★ BLACK GLOCK 16mm ★', 0, -24);
 
     ctx.restore();
   }
@@ -3002,11 +3164,7 @@ export class WorldRenderer {
     ctx.rotate(de.tiltAngle || 0);
     ctx.scale(de.scaleX, de.scaleY);
 
-    // Pink goo aura oozing out of seams
-    ctx.shadowColor = '#f472b6';
-    ctx.shadowBlur = 18;
-
-    // Delegate to standard drawEnemy styling, but with giant cartoon swell, dizzy spiral "X X" eyes, and bulging cheeks!
+    // Zero-cost cartoon pink pressure outline (NO blur, NO filter for 60 FPS!)
     const dummyEnemy = {
       type: de.type,
       x: 0,
@@ -3022,11 +3180,8 @@ export class WorldRenderer {
       tiltAngle: 0
     };
 
-    // Draw the swelling cartoon body
-    ctx.save();
-    ctx.filter = 'saturate(1.4) brightness(1.15)';
+    // Draw the swelling cartoon body natively
     this.drawEnemy(dummyEnemy, 0, time);
-    ctx.restore();
 
     // Overlay giant cartoon knock-out "X X" eyes on top!
     ctx.strokeStyle = '#ec4899';

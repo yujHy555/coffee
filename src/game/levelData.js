@@ -262,18 +262,18 @@ export function createLevelData() {
     }
   ];
 
-  // Collectible Espresso Bean Blaster Gun Pickups placed right on the starting terrace and Zone 2 checkpoint!
+  // Collectible Black Glock 16mm Gun Pickups placed right on the starting terrace and Zone 2 checkpoint!
   const weaponPickups = [
     {
-      id: 'bean-blaster-starter',
-      name: 'Espresso Bean Blaster',
+      id: 'glock-16mm-starter',
+      name: 'Black Glock 16mm',
       x: 285,
       y: 452,
       collected: false
     },
     {
-      id: 'bean-blaster-zone2',
-      name: 'Golden Rapid Bean Blaster',
+      id: 'glock-16mm-zone2',
+      name: 'Tactical Black Glock 16mm',
       x: 3460,
       y: 420,
       collected: false

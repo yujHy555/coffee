@@ -31,7 +31,7 @@ const engine = new CoffeePlatformerEngine(canvas, {
       heartsHtml += `<span class="heart active" title="Nitro Foam Shield Active" style="color:#f472b6">🛡</span>`;
     }
     if (state.hasBeanGun) {
-      heartsHtml += `<span class="heart active" title="Espresso Bean Blaster Equipped" style="color:#fde047; text-shadow: 0 0 8px rgba(253, 224, 71, 0.8)">🔫</span>`;
+      heartsHtml += `<span class="heart active" title="Black Glock 16mm Equipped" style="color:#fde047; text-shadow: 0 0 8px rgba(253, 224, 71, 0.8)">🔫</span>`;
     }
     hudHearts.innerHTML = heartsHtml;
 
@@ -42,12 +42,12 @@ const engine = new CoffeePlatformerEngine(canvas, {
     hudProductsCount.textContent = `${state.discoveredCount} / ${state.totalProducts}`;
 
     if (touchShotBtn && state.hasBeanGun) {
-      touchShotBtn.innerHTML = '🔫 Shoot Beans';
-      touchShotBtn.style.background = 'linear-gradient(135deg, #ec4899, #be185d)';
-      touchShotBtn.style.borderColor = '#fbcfe8';
+      touchShotBtn.innerHTML = '🔫 Glock 16mm';
+      touchShotBtn.style.background = 'linear-gradient(135deg, #27272a, #09090b)';
+      touchShotBtn.style.borderColor = '#71717a';
     }
     if (hintShot && state.hasBeanGun) {
-      hintShot.innerHTML = '<kbd>X</kbd> / <kbd>Click</kbd> Shoot Beans 🔫';
+      hintShot.innerHTML = '<kbd>X</kbd> / <kbd>Click</kbd> Glock 16mm 🔫';
       hintShot.style.color = '#fde047';
     }
   },

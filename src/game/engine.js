@@ -479,33 +479,40 @@ export class CoffeePlatformerEngine {
     });
   }
 
-  spawnPinkGooExplosion(x, y, count = 34, maxSpeed = 380) {
-    // 1. Comic splat shockwave ring
+  spawnPinkGooExplosion(x, y, count = 16, maxSpeed = 340) {
+    // 1. Comic splat shockwave ring (keep at most 5 active)
+    if (this.splatBursts.length > 5) {
+      this.splatBursts.splice(0, this.splatBursts.length - 5);
+    }
     this.splatBursts.push({
       x,
       y,
       r: 8,
-      maxR: 54,
-      life: 0.35,
-      maxLife: 0.35,
+      maxR: 44,
+      life: 0.28,
+      maxLife: 0.28,
       color: '#ec4899'
     });
 
-    // 2. High-energy glossy pink goo droplets & globules flying in all directions
+    // 2. High-energy glossy pink goo droplets (cap active pool to 36 max to prevent any frame drops)
+    if (this.pinkGooParticles.length + count > 36) {
+      this.pinkGooParticles.splice(0, (this.pinkGooParticles.length + count) - 36);
+    }
+
     const pinkShades = ['#ec4899', '#f472b6', '#db2777', '#fbcfe8', '#f43f5e', '#ffffff'];
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = 65 + Math.random() * maxSpeed;
+      const speed = 75 + Math.random() * maxSpeed;
       const color = pinkShades[Math.floor(Math.random() * pinkShades.length)];
       this.pinkGooParticles.push({
-        x: x + (Math.random() - 0.5) * 16,
-        y: y + (Math.random() - 0.5) * 16,
+        x: x + (Math.random() - 0.5) * 12,
+        y: y + (Math.random() - 0.5) * 12,
         vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - 80,
-        r: 3.2 + Math.random() * 5.4,
+        vy: Math.sin(angle) * speed - 60,
+        r: 3 + Math.random() * 4,
         color,
-        life: 0.6 + Math.random() * 0.45,
-        maxLife: 1.05,
+        life: 0.5 + Math.random() * 0.35,
+        maxLife: 0.85,
         gravity: 520
       });
     }
@@ -513,14 +520,13 @@ export class CoffeePlatformerEngine {
 
   damageEnemy(enemy, dmg, knockbackVx = 0, isBeanShot = false) {
     if (isBeanShot) {
-      dmg = 999; // Lethal 1-shot kill when shot with Bean Blaster
+      dmg = 999; // Lethal 1-shot kill when shot with Black Glock 16mm
     }
     enemy.hp -= dmg;
     enemy.hitFlashTimer = 0.2;
     this.impulseEnemyScale(enemy, 1.45, 0.62, 4.0);
-    this.spawnPinkGooExplosion(enemy.x, enemy.y, 14, 180);
-    this.shakeTimer = 0.16;
-    this.shakeIntensity = 6;
+    this.shakeTimer = 0.14;
+    this.shakeIntensity = 5.5;
 
     if (enemy.hp <= 0) {
       enemy.dead = true;
@@ -533,27 +539,28 @@ export class CoffeePlatformerEngine {
         type: enemy.type,
         x: enemy.x,
         y: enemy.y,
-        vx: knockbackVx * 0.5,
-        vy: -150,
+        vx: knockbackVx * 0.45,
+        vy: -140,
         scaleX: enemy.scaleX || 1,
         scaleY: enemy.scaleY || 1,
         facing: enemy.vx >= 0 ? 1 : -1,
         tiltAngle: enemy.tiltAngle || 0,
         timer: 0,
-        duration: 0.26,
+        duration: 0.24,
         exploded: false,
         groundY: enemy.groundY || enemy.y
       });
 
-      // Massive explosive pink goo splatter cascade!
-      this.spawnPinkGooExplosion(enemy.x, enemy.y, 38, 420);
-      this.shakeTimer = 0.24;
-      this.shakeIntensity = 8.5;
+      // Juicy explosive pink goo splatter cascade (optimized count for 60 FPS!)
+      this.spawnPinkGooExplosion(enemy.x, enemy.y, 16, 360);
+      this.shakeTimer = 0.22;
+      this.shakeIntensity = 7.5;
 
       this.addFloatingText(enemy.x, enemy.y - 28, '+500 GOO SPLAT!', '#f472b6');
       this.addFloatingText(enemy.x, enemy.y - 10, 'KER-SPLAT!', '#fbcfe8');
       this.syncHud();
     } else {
+      this.spawnCoffeeSplash(enemy.x, enemy.y, 8, '#f59e0b');
       enemy.knockbackVx = knockbackVx;
       if (enemy.type !== 'steam_spirit') {
         enemy.vy = -215;
@@ -935,9 +942,9 @@ export class CoffeePlatformerEngine {
           p.hasBeanGun = true;
           sound.playProductUnlock();
           this.impulseScale(1.34, 0.76, 3.5);
-          this.addFloatingText(pickup.x, pickup.y - 36, '★ BEAN BLASTER EQUIPPED! ★', '#f472b6');
+          this.addFloatingText(pickup.x, pickup.y - 36, '★ BLACK GLOCK 16mm EQUIPPED! ★', '#f472b6');
           this.addFloatingText(pickup.x, pickup.y - 14, '[X] / [CLICK] TO SHOOT BEANS!', '#fde047');
-          this.spawnPinkGooExplosion(pickup.x, pickup.y, 22, 190);
+          this.spawnPinkGooExplosion(pickup.x, pickup.y, 14, 160);
           this.syncHud();
         }
       }
@@ -1188,10 +1195,10 @@ export class CoffeePlatformerEngine {
 
       if (de.timer >= de.duration && !de.exploded) {
         de.exploded = true;
-        this.spawnPinkGooExplosion(de.x, de.y, 38, 420);
+        this.spawnPinkGooExplosion(de.x, de.y, 16, 360);
         sound.playEnemyDefeat();
-        this.shakeTimer = 0.24;
-        this.shakeIntensity = 8.5;
+        this.shakeTimer = 0.22;
+        this.shakeIntensity = 7.5;
       }
 
       if (de.timer >= de.duration + 0.08) {
@@ -1209,24 +1216,26 @@ export class CoffeePlatformerEngine {
       pt.life -= dt;
 
       // Check collision with platform surfaces to spawn persistent pink goo splats
+      // Fast AABB rejection: skip curve evaluation if particle is nowhere near platform!
       for (const plat of this.level.platforms) {
-        if (pt.x >= plat.x && pt.x <= plat.x + plat.w && pt.vy > 0) {
-          const surfY = this.getPlatformSurfaceY(plat, pt.x, this.time);
-          if (pt.y >= surfY - 5 && pt.y <= surfY + 16) {
-            if (this.pinkGooSplats.length < 80) {
-              this.pinkGooSplats.push({
-                x: pt.x,
-                y: surfY,
-                rx: 7 + Math.random() * 12,
-                ry: 2.5 + Math.random() * 3.5,
-                color: pt.color,
-                life: 6.5 + Math.random() * 3.5,
-                maxLife: 10.0
-              });
-            }
-            pt.life = 0;
-            break;
+        if (pt.x < plat.x || pt.x > plat.x + plat.w) continue;
+        if (pt.y < plat.y - 8 || pt.y > plat.y + 20 || pt.vy <= 0) continue;
+
+        const surfY = this.getPlatformSurfaceY(plat, pt.x, this.time);
+        if (pt.y >= surfY - 4 && pt.y <= surfY + 12) {
+          if (this.pinkGooSplats.length < 24) {
+            this.pinkGooSplats.push({
+              x: pt.x,
+              y: surfY,
+              rx: 6 + Math.random() * 8,
+              ry: 2 + Math.random() * 2.5,
+              color: pt.color,
+              life: 4.5,
+              maxLife: 4.5
+            });
           }
+          pt.life = 0;
+          break;
         }
       }
 
